@@ -333,7 +333,6 @@ export function Landing() {
           selfHosted: copy.nav.selfHosted,
           docs: copy.nav.docs,
         }}
-        githubLabel={copy.nav.github}
         enterLabel={copy.nav.enter}
         onEnterWorkspace={enterWorkspace}
         languageToggle={{
