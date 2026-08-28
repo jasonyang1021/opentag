@@ -17,6 +17,10 @@ import { homeRoute } from "./routing.ts";
 import "./i18n";
 import "./styles.css";
 import "./iconMotion.css";
+import { applyTheme, getTheme } from "./theme.ts";
+
+// Apply the device preference before React paints so dark/raft never flash through light.
+applyTheme(getTheme());
 
 // Public home ("/"). The marketing Landing is for anonymous visitors only; a user who has — or is
 // still resolving — a session must never see it. While the bootstrap runs we show the workspace

@@ -311,6 +311,12 @@ components:
 
 ## Overview
 
+## Application appearance themes
+
+The authenticated workspace supports three device-local themes selected in Settings › Appearance. `Light` is the canonical editorial system documented below and must remain visually unchanged. `Dark` maps the same hierarchy to warm charcoal surfaces and warm-white text without introducing a developer-console aesthetic. `Raft` is an optional high-contrast treatment: paper-white/warm-white surfaces, near-black structural rules, square geometry, hard offset shadows, a yellow navigation rail, pink selection, and cyan/lavender/coral/green status accents. It is inspired by the observed interaction language, not a copy of third-party brand assets.
+
+Theme selection is applied using `data-theme` on the document root. Shared semantic tokens remain the primary implementation mechanism; component-level overrides are reserved for geometry that cannot be expressed by color tokens. Theme changes apply immediately, persist only on the current device, and must be installed before React's first paint to avoid a light-theme flash.
+
 open-tag's warm-editorial design system reads like a quietly editorial print magazine. The base canvas is off-white `{colors.canvas}` (#f5f5f5) holding warm near-black ink `{colors.ink}` (#0c0a09). Visual energy is **atmospheric, not chromatic**: soft pastel gradient orbs (mint, peach, lavender, sky) drift through the page as the only deliberate "color" moments. There is no neon accent, no saturated CTA color, no dark-canvas developer-tools atmosphere.
 
 Type pairs **EB Garamond Light** (open-source serif at weight 300) for display with **Inter** for body, navigation, captions, and buttons. The display weight at 300 is the editorial signature — never bold, never heavy. Licensed alternatives such as GT Sectra are also compatible if closer optical fidelity to a narrower modern serif is desired.

@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { daemonUpdateCommandTemplate, isDaemonUpdateAvailable } from "../machineUi.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { useToast } from "../toast.tsx";
+import { getTheme, saveTheme, THEMES, type Theme } from "../theme.ts";
 
 export function Tasks() {
   const { channels, slug } = useStore();
@@ -353,6 +354,7 @@ export function Search() {
 // SETTINGS labels are i18n keys; call t(label) at render time
 const SETTINGS: [string, string][] = [
   ["account", "misc.settingsNavAccount"],
+  ["appearance", "misc.settingsNavAppearance"],
   ["server", "misc.settingsNavServer"],
   ["invites", "misc.settingsNavInvites"],
   ["notifications", "misc.settingsNavNotifications"],
@@ -375,10 +377,34 @@ export function Settings() {
       <main className="content-col">
         <div className="head"><h1>{t("misc.settingsTitle", { section: curLabel })}</h1></div>
         <div className="scroll">
-          {cur === "account" ? <AccountSettings api={api} /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationsSettings api={api} serverId={serverId} /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
+          {cur === "account" ? <AccountSettings api={api} /> : cur === "appearance" ? <AppearanceSettings /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationsSettings api={api} serverId={serverId} /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
         </div>
       </main>
     </>
+  );
+}
+function AppearanceSettings() {
+  const { t } = useTranslation();
+  const [theme, setTheme] = useState<Theme>(() => getTheme());
+  const choose = (next: Theme) => { setTheme(next); saveTheme(next); };
+  return (
+    <div className="appearance-settings">
+      <div className="appearance-title">{t("settings.appearanceTitle")}</div>
+      <div className="appearance-desc">{t("settings.appearanceDesc")}</div>
+      <div className="theme-grid" role="radiogroup" aria-label={t("settings.appearanceTitle")}>
+        {THEMES.map((value) => {
+          const name = value[0].toUpperCase() + value.slice(1);
+          return (
+            <button key={value} type="button" role="radio" aria-checked={theme === value} className={`theme-choice theme-choice-${value}${theme === value ? " on" : ""}`} onClick={() => choose(value)}>
+              <span className="theme-preview" aria-hidden="true"><span className="tp-rail" /><span className="tp-side"><i /><i /><i /></span><span className="tp-main"><i /><i /><i /></span></span>
+              <span className="theme-copy"><b>{t(`settings.theme${name}Name`)}</b><small>{t(`settings.theme${name}Desc`)}</small></span>
+              <span className="theme-check">{theme === value ? "✓" : ""}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="appearance-device-note">{t("settings.appearanceDeviceNote")}</div>
+    </div>
   );
 }
 function AccountSettings({ api }: { api: any }) {
