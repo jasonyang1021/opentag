@@ -768,7 +768,7 @@ main.content-col>.scroll .msg-head>.msg-agent-state{padding-right:76px}
 .thread-panel .msg-head .who{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .thread-panel .msg-head .ts{grid-column:1;grid-row:2}
 .thread-panel .msg-head .msg-agent-state{grid-column:2;grid-row:1;margin-left:0}
-.thread-composer{padding:4px 18px 14px}
+.thread-composer{flex:0 0 auto;padding:4px 18px 14px}
 /* Reminder status badge */
 .rem-badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9999px;border:1px solid var(--hair-strong)}
 .rem-badge.scheduled{background:var(--tint-blue);border-color:var(--g-sky);color:var(--ink)}
