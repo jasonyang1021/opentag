@@ -40,7 +40,7 @@ body{margin:0;font-family:var(--sans);font-size:16px;line-height:1.5;letter-spac
 button{font-family:inherit}
 .app{height:100vh;display:grid;grid-template-columns:56px var(--sb-w,248px) 1fr;position:relative}
 .app.has-panel{grid-template-columns:56px var(--sb-w,248px) minmax(0,1fr) var(--traj-w,320px)}
-.resizer{position:absolute;top:0;bottom:0;width:7px;cursor:col-resize;z-index:45;background:transparent;transition:background .12s}
+.resizer{position:absolute;top:0;bottom:0;width:7px;cursor:col-resize;z-index:45;background:transparent;transition:background .12s;touch-action:none}
 .resizer:hover{background:var(--g-sky)}
 .resizer-sb{left:calc(56px + var(--sb-w,248px) - 3px)}
 .resizer-traj{right:calc(var(--traj-w,320px) - 3px)}

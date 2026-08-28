@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type MouseEvent as RMouseEvent, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type PointerEvent as RPointerEvent, type SetStateAction } from "react";
 import { Outlet, useLocation, useParams, useNavigate } from "react-router-dom";
 import { IconSearch, IconChat, IconTasks, IconUsers, IconMonitor, IconSettings, IconInbox } from "./icons.tsx";
 import { useStore } from "./store.tsx";
@@ -7,6 +7,7 @@ import { QuickSwitcher } from "./QuickSwitcher.tsx";
 import { Menu, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSystemAlerts, NotificationCenter } from "./alerts.tsx";
+import { resizedPanelWidth } from "./panelResize.ts";
 
 const SECTIONS = [
   { key: "search", Icon: IconSearch, labelKey: "nav.search" },
@@ -41,14 +42,18 @@ export function Layout() {
   useEffect(() => { for (const v of ["--sb-w", "--traj-w"]) { const s = localStorage.getItem("open-tag" + v); if (s) document.documentElement.style.setProperty(v, s); } }, []);
   useEffect(() => { document.body.classList.remove("sb-open"); }, [loc.pathname]); // mobile: auto-close drawer on route change (channel select / view switch)
   useEffect(() => { const h = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setShowQS(true); } }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, []); // Cmd/Ctrl+K global quick switcher
-  const startResize = (which: "sb" | "traj") => (e: RMouseEvent) => {
+  const startResize = (which: "sb" | "traj") => (e: RPointerEvent) => {
     e.preventDefault();
     const varName = which === "sb" ? "--sb-w" : "--traj-w";
     const startX = e.clientX;
     const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue(varName)) || (which === "sb" ? 248 : 320);
-    const onMove = (ev: MouseEvent) => { const d = which === "sb" ? ev.clientX - startX : startX - ev.clientX; document.documentElement.style.setProperty(varName, Math.max(180, Math.min(560, cur + d)) + "px"); };
-    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); localStorage.setItem("open-tag" + varName, getComputedStyle(document.documentElement).getPropertyValue(varName).trim()); };
-    window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
+    const sidebarWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sb-w")) || 248;
+    const onMove = (ev: PointerEvent) => {
+      const d = which === "sb" ? ev.clientX - startX : startX - ev.clientX;
+      document.documentElement.style.setProperty(varName, resizedPanelWidth(which, cur, d, window.innerWidth, sidebarWidth) + "px");
+    };
+    const onUp = () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp); localStorage.setItem("open-tag" + varName, getComputedStyle(document.documentElement).getPropertyValue(varName).trim()); };
+    window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onUp);
   };
   return (
     <div className={"app" + (isChat ? " is-chat" : "") + (isChat && chatPanelOpen ? " has-panel" : "")}>
@@ -81,8 +86,8 @@ export function Layout() {
           onDismiss={(a) => setDismissed((s) => { const n = new Set(s); n.add(a.id); return n; })} />
       )}
       <Outlet context={{ setChatPanelOpen } satisfies LayoutOutletContext} />
-      <div className="resizer resizer-sb" onMouseDown={startResize("sb")} title={t("common.resizeSidebar")} />
-      {isChat && chatPanelOpen && <div className="resizer resizer-traj" onMouseDown={startResize("traj")} title={t("common.resizeTraj")} />}
+      <div className="resizer resizer-sb" onPointerDown={startResize("sb")} title={t("common.resizeSidebar")} />
+      {isChat && chatPanelOpen && <div className="resizer resizer-traj" onPointerDown={startResize("traj")} title={t("common.resizeTraj")} />}
     </div>
   );
 }
