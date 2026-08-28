@@ -41,7 +41,10 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // textarea auto-grows up to 160px
+  // Reset to zero before measuring. `auto` can absorb the remaining height when this
+  // composer is mounted as a flex child (the thread panel), making an empty textarea
+  // report the 160px cap instead of its one-line content height.
+  useEffect(() => { const el = inputRef.current; if (!el) return; el.style.height = "0px"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }, [text]); // textarea auto-grows up to 160px
 
   // Reachability hint as the input placeholder. Targets a message will reach = the DM peer (if any) + agents
   // @-mentioned in the current draft. Surfaces when a target's machine is offline (the message is saved but the
