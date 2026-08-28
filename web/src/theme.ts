@@ -9,7 +9,7 @@ export function isTheme(value: string | null): value is Theme {
 
 export function getTheme(): Theme {
   const saved = localStorage.getItem(STORAGE_KEY);
-  return isTheme(saved) ? saved : "light";
+  return isTheme(saved) ? saved : "dark";
 }
 
 export function applyTheme(theme: Theme) {
