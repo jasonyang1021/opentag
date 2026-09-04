@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, ChevronRight, Check, Copy, Eye, EyeOff } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -776,7 +777,9 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
       : supportsLocalDefault ? [] : [{ value: "default", label: t("members.modelDefault") }]),
   ];
   const modelLoadingOpts = [{ value: "", label: t("members.modelDetecting") }];
-  return (
+  // This modal can be opened from an action card inside Chat's scrolling message list.
+  // Portaling it keeps the fixed backdrop relative to the viewport rather than that list.
+  return createPortal(
     <div className="modal-bg">
       <div className="modal">
         <h3>{t("members.createAgentTitle")}</h3>
@@ -805,6 +808,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy || !machineId} title={!machineId ? t("members.machineRequired") : undefined}>{busy ? t("members.creating") : t("members.create")}</button></div>
       </div>
     </div>
+    , document.body,
   );
 }
 
