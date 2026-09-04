@@ -42,9 +42,11 @@ const daemonOut = path.join(distDir, "cli.mjs");
 await build({ ...common, entryPoints: [path.join(root, "src/daemon/index.ts")], outfile: daemonOut, banner: { js: requireShim }, define: { "process.env.DAEMON_VERSION": JSON.stringify(daemonVersion) } });
 chmodSync(daemonOut, 0o755);
 
+await build({ ...common, entryPoints: [path.join(root, "src/daemon/workspaceDependenciesMcp.ts")], outfile: path.join(distDir, "workspace-deps-mcp.mjs"), banner: { js: requireShim } });
+
 // Agent CLI — invoked by the generated wrapper via `node agent-cli.mjs`, so no shebang needed.
 const agentOut = path.join(distDir, "agent-cli.mjs");
 await build({ ...common, entryPoints: [path.join(root, "src/cli/index.ts")], outfile: agentOut, banner: { js: requireShim } });
 
 const kb = (f) => (statSync(f).size / 1024).toFixed(0);
-console.log(`✓ built packages/daemon/dist/cli.mjs (${kb(daemonOut)} KB) + agent-cli.mjs (${kb(agentOut)} KB)`);
+console.log(`✓ built packages/daemon/dist/cli.mjs (${kb(daemonOut)} KB) + agent-cli.mjs (${kb(agentOut)} KB) + workspace-deps-mcp.mjs`);

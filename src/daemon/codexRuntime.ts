@@ -2,6 +2,8 @@
 // System prompt is passed via developerInstructions; each delivery = one turn/start (serial, waits for turn/completed).
 // Automatically approves exec/patch/elicitation requests in daemon mode.
 import { type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { spawnSafe } from "./spawnSafe.js";
 import { killTree } from "./killTree.js";
 import { initialTurnAdmission, protocolAdmission, type ProtocolAdmission, type Runtime, type StartOpts, type RuntimeCallbacks, type RuntimeSession } from "./runtime.js";
@@ -9,6 +11,23 @@ import { initialTurnAdmission, protocolAdmission, type ProtocolAdmission, type R
 const MAX = 2000;
 const clip = (s: unknown) => String(s ?? "").slice(0, MAX);
 const EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]);
+const WORKSPACE_DEPENDENCIES_MCP_FLAG = "--open-tag-workspace-dependencies-mcp";
+function workspaceDependenciesMcpCommand(): { command: string; args: string[] } {
+  const bundledEntry = fileURLToPath(new URL("./workspace-deps-mcp.mjs", import.meta.url));
+  if (existsSync(bundledEntry)) {
+    return { command: process.execPath, args: [bundledEntry, WORKSPACE_DEPENDENCIES_MCP_FLAG] };
+  }
+
+  // `npm run daemon` executes this file directly from src/. Use the repository's
+  // installed tsx CLI in that case; the packaged daemon takes the bundled branch above.
+  const tsxCli = fileURLToPath(new URL("../../node_modules/tsx/dist/cli.mjs", import.meta.url));
+  const sourceEntry = fileURLToPath(new URL("./workspaceDependenciesMcp.ts", import.meta.url));
+  return { command: process.execPath, args: [tsxCli, sourceEntry, WORKSPACE_DEPENDENCIES_MCP_FLAG] };
+}
+export function codexAppServerArgs(): string[] {
+  const mcp = workspaceDependenciesMcpCommand();
+  return ["app-server", "--listen", "stdio://", "--config", `mcp_servers.open_tag_workspace_dependencies.command=${JSON.stringify(mcp.command)}`, "--config", `mcp_servers.open_tag_workspace_dependencies.args=${JSON.stringify(mcp.args)}`];
+}
 function extractThreadId(r: any): string {
   return (r && (r.threadId || r.thread?.id || r.thread_id || r.id)) || "";
 }
@@ -165,7 +184,7 @@ export const codexRuntime: Runtime = {
   start(opts: StartOpts, cb: RuntimeCallbacks): RuntimeSession {
     // Do not override CODEX_HOME: use the user's default ~/.codex (which contains subscription auth state).
     // Per-agent CODEX_HOME isolation + auth/MCP injection is a future improvement.
-    const proc = spawnSafe("codex", ["app-server", "--listen", "stdio://"], { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
+    const proc = spawnSafe("codex", codexAppServerArgs(), { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env });
     const client = new CodexClient(proc, cb);
     const admission = initialTurnAdmission(cb);
     let ready = false;

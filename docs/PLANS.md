@@ -23,6 +23,8 @@
 
 - **Reasonix runtime** — new compute-plane adapter (experimental) for the DeepSeek-native Reasonix CLI: one-shot-per-turn via `reasonix run --output-format stream-json`, resumed by `--resume <session-file>` (session file under `$REASONIX_HOME/projects/<encoded-cwd>/sessions/`), model enumeration via `reasonix doctor --json`. Execution plan: [`docs/exec-plans/active/reasonix-runtime.md`](./exec-plans/active/reasonix-runtime.md).
 
+- **Codex Artifact Runtime injection** — bundled local MCP service supplies validated runtime paths to Codex document/artifact skills launched through the daemon. Execution plan: [`docs/exec-plans/active/codex-artifact-runtime.md`](./exec-plans/active/codex-artifact-runtime.md).
+
 *(Completed plans live in `docs/exec-plans/completed/`.)*
 
 ## Completed slice history (index only)

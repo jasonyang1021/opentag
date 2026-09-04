@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { codexRuntime } from "./codexRuntime.js";
+import { codexAppServerArgs, codexRuntime } from "./codexRuntime.js";
 import { AgentManager, type AgentConfig } from "./agentManager.js";
 import { ResourceBudget } from "./resourceBudget.js";
 
@@ -19,6 +19,20 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 5_000): Promise<voi
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 };
+
+test("Codex app-server receives a runnable workspace-dependencies MCP config", () => {
+  const args = codexAppServerArgs();
+  const commandConfig = args.find((arg) => arg.startsWith("mcp_servers.open_tag_workspace_dependencies.command="));
+  const argsConfig = args.find((arg) => arg.startsWith("mcp_servers.open_tag_workspace_dependencies.args="));
+  assert.ok(commandConfig);
+  assert.ok(argsConfig);
+
+  const command = JSON.parse(commandConfig.slice(commandConfig.indexOf("=") + 1));
+  const mcpArgs = JSON.parse(argsConfig.slice(argsConfig.indexOf("=") + 1));
+  assert.equal(command, process.execPath);
+  assert.equal(mcpArgs.at(-1), "--open-tag-workspace-dependencies-mcp");
+  assert.ok(mcpArgs.some((arg: string) => /workspaceDependenciesMcp\.ts$|workspace-deps-mcp\.mjs$/.test(arg)));
+});
 
 test("missing codex binary reports offline instead of crashing daemon", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "open-tag-codex-missing-"));

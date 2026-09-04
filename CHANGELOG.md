@@ -11,6 +11,7 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ### Fixed
 
+- Codex agents started by the daemon now receive a local `load_workspace_dependencies` MCP tool. This restores the validated Artifact Runtime paths required by bundled Word, spreadsheet, PDF, and presentation skills without granting extra filesystem permissions.
 - Pi-compatible runtimes can be launched through an explicit `OPEN_TAG_PI_COMMAND`, avoiding
   Windows batch wrappers that truncate multiline wake prompts. A zero exit with no parseable JSON
   events is now reported as an error instead of producing a misleading empty "Handled" receipt.
