@@ -9,6 +9,20 @@ import { useToast } from "../toast.tsx";
 const isImage = (m?: string) => !!m && m.startsWith("image/");
 const handleKey = (s: string) => s.normalize("NFC").toLowerCase();
 
+type MentionRoster = {
+  channelId: string;
+  agents: Pick<Agent, "id" | "name" | "displayName" | "avatarUrl">[];
+  humans: { userId: string; name: string; displayName?: string; avatarUrl?: string | null }[];
+};
+
+export function channelMentionCandidates(roster: MentionRoster, channelId: string, query: string) {
+  if (roster.channelId !== channelId) return [];
+  return [
+    ...roster.agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent" as const, avatarUrl: a.avatarUrl })),
+    ...roster.humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human" as const, avatarUrl: h.avatarUrl })),
+  ].filter((candidate) => candidate.name && handleKey(candidate.name).includes(handleKey(query))).slice(0, 8);
+}
+
 export function canSendComposerDraft(text: string, pendingAtts: { status?: string }[]): boolean {
   return pendingAtts.every((a) => a.status === "done") && (!!text.trim() || pendingAtts.length > 0);
 }
@@ -27,7 +41,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
 }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const { api, visibleAgents: agents, humans, machines, uploadOne, attachmentUrl } = useStore(); // visibleAgents: only real agents are @-mention candidates / reachability targets (not showcase demo props)
+  const { api, visibleAgents: agents, machines, uploadOne, attachmentUrl, onEvent } = useStore(); // visibleAgents still resolves reachability; autocomplete itself is restricted to the current channel roster
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [text, setText] = useState("");
   const [asTask, setAsTask] = useState(false);
@@ -36,11 +50,29 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const [pendingAtts, setPendingAtts] = useState<any[]>([]); // uploaded attachments queued to send with the next message
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [mentionRoster, setMentionRoster] = useState<MentionRoster>({ channelId: "", agents: [], humans: [] });
   const sendingRef = useRef(false);
   const atPosRef = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!channelId) { setMentionRoster({ channelId: "", agents: [], humans: [] }); return; }
+    let active = true;
+    let requestId = 0;
+    const load = async () => {
+      const currentRequest = ++requestId;
+      try {
+        const data = await api("GET", `/api/channels/${channelId}/members`);
+        if (active && currentRequest === requestId) setMentionRoster({ channelId, agents: data?.agents || [], humans: data?.humans || [] });
+      } catch {
+        if (active && currentRequest === requestId) setMentionRoster({ channelId, agents: [], humans: [] });
+      }
+    };
+    void load();
+    const off = onEvent((event) => { if (event.type === "channel:members-updated" && event.channelId === channelId) void load(); });
+    return () => { active = false; off(); };
+  }, [channelId]);
   // Measure from the one-line baseline. An `auto`/zero reset can participate in the
   // thread panel's flex sizing and report the 160px cap for an empty textarea.
   useEffect(() => {
@@ -123,8 +155,8 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const onPaste = (e: RClipboardEvent) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/")).map((f, i) => new File([f], `pasted-${Date.now()}${i ? "-" + i : ""}.${f.type.split("/")[1] || "png"}`, { type: f.type })); if (imgs.length) { e.preventDefault(); addFiles(imgs); } };
   const onDrop = (e: RDragEvent) => { const fs = Array.from(e.dataTransfer?.files ?? []); if (fs.length) { e.preventDefault(); addFiles(fs); } };
 
-  // @ mention autocomplete: candidates are all workspace agents + humans (not just current channel members) —
-  // in a public channel, @-ing a non-member pulls them in (server-side auto-join), so suggesting them is intended.
+  // @ mention autocomplete is scoped to this channel/DM/thread's roster. The server may still auto-join a
+  // reachable non-member when someone manually types an exact handle, but the picker never advertises outsiders.
   const onInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value; setText(v);
     const pos = e.target.selectionStart ?? v.length;
@@ -132,10 +164,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
     if (m) { setAtQuery(m[1]); atPosRef.current = pos - m[0].length; } else setAtQuery(null);
     setAtSel(0); // typing narrows the list → restart highlight at the top
   };
-  const cands = atQuery === null ? [] : [
-    ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent", avatarUrl: a.avatarUrl })),
-    ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human", avatarUrl: h.avatarUrl })),
-  ].filter((c) => c.name && handleKey(c.name).includes(handleKey(atQuery || ""))).slice(0, 8);
+  const cands = atQuery === null ? [] : channelMentionCandidates(mentionRoster, channelId, atQuery);
   const pick = (c: { name: string }) => {
     if (sendingRef.current) return;
     const start = atPosRef.current;

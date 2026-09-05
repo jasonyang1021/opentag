@@ -366,7 +366,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Real-time: new DM / channel membership change → reload lists + join the new channel room
       // (the server validates membership; non-member join requests are rejected).
       sock.on("dm:new", (p: any) => { reload(); if (p?.channelId) sockRef.current?.emit("join:channel", p.channelId); });
-      sock.on("channel:members-updated", (p: any) => { reload(); if (p?.channelId) sockRef.current?.emit("join:channel", p.channelId); });
+      sock.on("channel:members-updated", (p: any) => {
+        reload();
+        if (p?.channelId) sockRef.current?.emit("join:channel", p.channelId);
+        dispatch({ type: "channel:members-updated", ...p }); // current Composer refetches its scoped @mention roster immediately
+      });
       // Machine online/offline → reload machine list (DB is source of truth for status/daemon version/runtimes/new rows).
       // Note: machine:status payload omits id (only forwards {online,hostname,runtimes}), so targeted row update is not possible → full reload is safest.
       sock.on("machine:status", async (p: any) => {
