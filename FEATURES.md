@@ -109,8 +109,5 @@
 - [x] **Landing page (`/`)**: warm-editorial skin, 9 sections (hero / three pillars / capability cards / engine / self-hosted architecture / CTA / footer); CSS fully `.lp-*` scoped, isolated from the app skin; copy grounded in verified capabilities (no pricing / testimonials / star counts)
 - [x] **Public features page (`/features`)**: five static open-tag cases rendered with the landing skin + a product UI demo (channel message → tracked task → clickable reply-count pill → thread evidence panel), with no backend/API/live-agent calls
 
-## Showcase (static demo page)
-- [x] **Front-end static showcase page**: four case-study transcripts rendered purely client-side (`web/src/views/Showcase.tsx` + `web/src/showcaseData.ts`, sample files under `web/public/showcase/`); zero DB, zero prop agents, one shared copy for every visitor — no workspace data can leak through the demo. Replaced the former DB-backed `#showcase` channel + per-workspace seed (backend path deleted; `scripts/drop-showcase.mjs` cleans pre-existing rows)
-
 ## Web UI Polish
 - [x] **Icon micro-interactions (Amicro-style, pure CSS)**: semantic hover motion on interactive icons via one shared overshoot curve (`--im-spring`) and a two-class API (`im` trigger + `im-*` effect), zero JS/deps (`web/src/iconMotion.css`); hover-capable devices only + `prefers-reduced-motion` respected; principles + usage rules in `docs/icon-motion.md`
