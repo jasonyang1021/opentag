@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make Graph a first-class Members navigation destination and render the workspace as an interactive member-to-member collaboration network derived from shared channel membership.
+Make Graph a first-class Members navigation destination and render the workspace as an interactive member-to-member collaboration network derived from real collaboration activity.
 
 ## Scope
 
@@ -15,7 +15,8 @@ Make Graph a first-class Members navigation destination and render the workspace
 
 ## Verification
 
-- Graph helper unit tests.
-- Root and web TypeScript checks.
-- Production web build.
-- Browser verification against a real workspace after deployment.
+- Graph helper unit tests: 3 passed.
+- Root and web TypeScript checks: passed.
+- Production web build: passed.
+- Huawei Cloud deployment: healthy over HTTPS.
+- Real workspace browser verification: Graph sidebar entry, 21-node/8-link activity network, insight panels, node-to-profile navigation, zoom, and reset all passed.
