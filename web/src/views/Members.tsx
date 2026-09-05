@@ -26,6 +26,7 @@ import {
   MAX_AGENT_INPUT_SOURCES,
   toggleAgentInputSource,
 } from "../lib/agentInputPolicy.ts";
+import { CollaborationGraph } from "./CollaborationGraph.tsx";
 
 // Unified agent status label: fine-grained activity (working/thinking/online) takes priority;
 // offline/absent falls back to lifecycle status (active/sleeping/inactive).
@@ -40,8 +41,15 @@ export function Members() {
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { agentId, userId } = useParams();
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modal, setModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
+  const directoryView = searchParams.get("view") === "graph" ? "graph" : "list";
+  const setDirectoryView = (view: "list" | "graph") => setSearchParams((current) => {
+    const next = new URLSearchParams(current);
+    if (view === "graph") next.set("view", "graph"); else next.delete("view");
+    return next;
+  });
 
   const byMachine: Record<string, typeof agents> = {};
   for (const a of agents) { const k = a.machineId || "_none"; (byMachine[k] = byMachine[k] || []).push(a); }
@@ -72,7 +80,16 @@ export function Members() {
         </div>
       </aside>
       <main className="content-col">
-        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile key={agentId} id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <Roster agents={agents} humans={humans} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
+        {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile key={agentId} id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <>
+          <div className="head member-directory-head">
+            <div><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: agents.length + humans.length })}</small></div>
+            <div className="seg-pill member-view-switch" role="group" aria-label={t("members.viewMode")}>
+              <button className={`seg-opt${directoryView === "list" ? " on" : ""}`} onClick={() => setDirectoryView("list")}>{t("members.viewList")}</button>
+              <button className={`seg-opt${directoryView === "graph" ? " on" : ""}`} onClick={() => setDirectoryView("graph")}>{t("members.viewGraph")}</button>
+            </div>
+          </div>
+          {directoryView === "graph" ? <CollaborationGraph /> : <Roster agents={agents} humans={humans} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
+        </>}
       </main>
       {modal && <CreateAgentModal onClose={() => setModal(false)} />}
       {inviteModal && <InviteHumanModal onClose={() => setInviteModal(false)} />}
@@ -123,9 +140,7 @@ function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans
   const total = agents.length + humans.length;
   const goKey = (e: React.KeyboardEvent, to: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); nav(to); } };
   return (
-    <>
-      <div className="head"><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: total })}</small></div>
-      <div className="scroll">
+    <div className="scroll">
         {total === 0 ? <div className="empty">{t("members.rosterEmpty")}{canCreate && <> {t("members.rosterEmptyCreate")} <button className="addbtn" onClick={onCreate}>+</button></>}</div>
           : <>
             {agents.length > 0 && <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span></div>}
@@ -153,7 +168,6 @@ function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans
             })}
           </>}
       </div>
-    </>
   );
 }
 

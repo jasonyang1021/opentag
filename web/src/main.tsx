@@ -18,7 +18,7 @@ import "./styles.css";
 import "./iconMotion.css";
 import { applyTheme, getTheme } from "./theme.ts";
 
-// Apply the device preference before React paints so dark/raft never flash through light.
+// Apply the device preference before React paints so saved dark/collaboration themes never flash through light.
 applyTheme(getTheme());
 
 // Public home ("/"). The marketing Landing is for anonymous visitors only; a user who has — or is

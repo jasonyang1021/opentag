@@ -1,4 +1,4 @@
-export const THEMES = ["light", "dark"] as const;
+export const THEMES = ["light", "dark", "collaboration"] as const;
 export type Theme = (typeof THEMES)[number];
 
 const STORAGE_KEY = "open-tag.theme";

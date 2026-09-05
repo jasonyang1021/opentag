@@ -123,6 +123,41 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     }
     return (sendJson(res, 200, map), true);
   }
+  // Workspace collaboration graph: one visibility-scoped snapshot for the Members graph view.
+  // Public channels are visible to every workspace member; private channels appear only when the caller is a member.
+  // DMs and threads are deliberately excluded: showing their membership would both clutter the organization map and
+  // reveal private relationship metadata that the top-level channel directory does not expose.
+  if (p === "/api/channels/collaboration-graph" && method === "GET") {
+    const { chs, joined } = await userChannels(serverId, userId);
+    const visibleChannels = chs.filter((channel) => !channel.deletedAt && !channel.archivedAt
+      && (channel.type === "channel" || (channel.type === "private" && joined.has(channel.id))));
+    const channelIds = visibleChannels.map((channel) => channel.id);
+    const memberships = channelIds.length
+      ? await db.select({ channelId: schema.channelMembers.channelId, memberType: schema.channelMembers.memberType, memberId: schema.channelMembers.memberId })
+        .from(schema.channelMembers).where(inArray(schema.channelMembers.channelId, channelIds))
+      : [];
+    const agentRows = await db.select({
+      id: schema.agents.id, name: schema.agents.name, displayName: schema.agents.displayName,
+      avatarUrl: schema.agents.avatarUrl, status: schema.agents.status, activity: schema.agents.activity,
+    }).from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt)));
+    const serverMemberRows = await db.select({ userId: schema.serverMembers.userId }).from(schema.serverMembers).where(eq(schema.serverMembers.serverId, serverId));
+    const humanRows = serverMemberRows.length ? await db.select({
+      id: schema.users.id, name: schema.users.name, displayName: schema.users.displayName, avatarUrl: schema.users.avatarUrl,
+    }).from(schema.users).where(inArray(schema.users.id, serverMemberRows.map((member) => member.userId))) : [];
+    const validAgents = new Set(agentRows.map((agent) => agent.id));
+    const validHumans = new Set(humanRows.map((human) => human.id));
+    return (sendJson(res, 200, {
+      humans: humanRows.map((human) => ({ ...human, type: "human" })),
+      agents: agentRows.map((agent) => ({ ...agent, type: "agent", status: agent.activity && agent.activity !== "offline" ? agent.activity : agent.status })),
+      channels: visibleChannels.map((channel) => ({ id: channel.id, type: "channel", name: channel.name, displayName: channel.name })),
+      memberships: memberships.flatMap((membership) => {
+        const memberType = membership.memberType === "user" ? "human" : membership.memberType;
+        if (memberType === "human" && validHumans.has(membership.memberId)) return [{ ...membership, memberType }];
+        if (memberType === "agent" && validAgents.has(membership.memberId)) return [{ ...membership, memberType }];
+        return [];
+      }),
+    }), true);
+  }
   // /channels only lists regular/private channels (bare array, no unread); DMs go through /channels/dm; unread counts through /channels/unread
   if (p === "/api/channels" && method === "GET") {
     const { chs, joined } = await userChannels(serverId, userId);
