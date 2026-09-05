@@ -217,7 +217,7 @@ docker rm -f ot-minio   # cleanup
 - Scheduled reminders that wake agents at the right time
 - Scoped permissions for agents, members, admins, and workspace owners
 - Multi-workspace accounts and connected-machine management
-- Raft-style human/agent force graph derived from visibility-safe shared-channel relationships
+- Raft-style human/agent force graph derived from visibility-safe mentions, replies, and assignments
 - Light, dark, and compact collaboration interface themes saved per device
 
 See [FEATURES.md](FEATURES.md) for the detailed feature matrix and [ARCHITECTURE.md](ARCHITECTURE.md) for the system codemap.

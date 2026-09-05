@@ -14,7 +14,7 @@ import {
   type MemberGraphNode,
 } from "../lib/collaborationGraph.ts";
 
-const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [] };
+const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [], interactions: [] };
 const GRAPH_WIDTH = 1040;
 const GRAPH_HEIGHT = 640;
 
@@ -32,7 +32,7 @@ export function CollaborationGraph() {
     setFailed(false);
     try {
       const result = await api("GET", "/api/channels/collaboration-graph");
-      if (!Array.isArray(result?.humans) || !Array.isArray(result?.agents) || !Array.isArray(result?.channels) || !Array.isArray(result?.memberships)) throw new Error("invalid graph response");
+      if (!Array.isArray(result?.humans) || !Array.isArray(result?.agents) || !Array.isArray(result?.channels) || !Array.isArray(result?.memberships) || !Array.isArray(result?.interactions)) throw new Error("invalid graph response");
       setData(result);
     } catch {
       setData(EMPTY);
@@ -87,7 +87,7 @@ export function CollaborationGraph() {
                   const target = positions.get(edge.targetKey);
                   if (!source || !target) return null;
                   const active = !focused || edge.sourceKey === memberNodeKey(focused) || edge.targetKey === memberNodeKey(focused);
-                  return <line key={`${edge.sourceKey}:${edge.targetKey}`} className={active ? "active" : "dim"} x1={source.x} y1={source.y} x2={target.x} y2={target.y} style={{ strokeWidth: Math.min(2.2, 0.65 + edge.weight * 0.22) }}><title>{t("members.graphSharedChannels", { count: edge.weight })}</title></line>;
+                  return <line key={`${edge.sourceKey}:${edge.targetKey}`} className={active ? "active" : "dim"} x1={source.x} y1={source.y} x2={target.x} y2={target.y} style={{ strokeWidth: Math.min(2.2, 0.65 + Math.log2(edge.weight + 1) * 0.32) }}><title>{t("members.graphInteractionCount", { count: edge.weight })}</title></line>;
                 })}
               </svg>
               {positioned.map((node) => {

@@ -125,8 +125,8 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   }
   // Workspace collaboration graph: one visibility-scoped snapshot for the Members graph view.
   // Public channels are visible to every workspace member; private channels appear only when the caller is a member.
-  // DMs and threads are deliberately excluded: showing their membership would both clutter the organization map and
-  // reveal private relationship metadata that the top-level channel directory does not expose.
+  // Channel summaries exclude DMs/threads. Interaction evidence may include a readable channel's inherited threads,
+  // but never DMs or a thread whose private parent is hidden from the caller.
   if (p === "/api/channels/collaboration-graph" && method === "GET") {
     const { chs, joined } = await userChannels(serverId, userId);
     const visibleChannels = chs.filter((channel) => !channel.deletedAt && !channel.archivedAt
@@ -146,6 +146,71 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
     }).from(schema.users).where(inArray(schema.users.id, serverMemberRows.map((member) => member.userId))) : [];
     const validAgents = new Set(agentRows.map((agent) => agent.id));
     const validHumans = new Set(humanRows.map((human) => human.id));
+    // Project actual collaboration evidence into an undirected member graph. A shared #all membership alone is
+    // not a useful relationship (it turns every workspace into one complete graph), so links come from messages:
+    // direct @mentions, trigger replies, thread replies to the parent author, and task assignments. Only messages
+    // in channels/threads readable by this caller are considered, preserving the same private-channel boundary.
+    const parentThreadRows = chs.filter((channel) => channel.type === "thread" && channel.parentMessageId);
+    const parentMessages = parentThreadRows.length ? await db.select({
+      id: schema.messages.id, channelId: schema.messages.channelId,
+      senderType: schema.messages.senderType, senderId: schema.messages.senderId,
+    }).from(schema.messages).where(and(
+      eq(schema.messages.serverId, serverId),
+      inArray(schema.messages.id, parentThreadRows.map((channel) => channel.parentMessageId!)),
+    )) : [];
+    const visibleChannelIds = new Set(channelIds);
+    const parentById = new Map(parentMessages.map((message) => [message.id, message]));
+    const threadParentByChannel = new Map(parentThreadRows.flatMap((thread) => {
+      const parent = parentById.get(thread.parentMessageId!);
+      return parent && visibleChannelIds.has(parent.channelId) ? [[thread.id, parent] as const] : [];
+    }));
+    const readableChannelIds = [...channelIds, ...threadParentByChannel.keys()];
+    const graphMessages = readableChannelIds.length ? await db.select({
+      id: schema.messages.id, channelId: schema.messages.channelId,
+      senderType: schema.messages.senderType, senderId: schema.messages.senderId,
+      replyToMessageId: schema.messages.replyToMessageId,
+      taskAssigneeType: schema.messages.taskAssigneeType, taskAssigneeId: schema.messages.taskAssigneeId,
+    }).from(schema.messages).where(and(
+      eq(schema.messages.serverId, serverId), inArray(schema.messages.channelId, readableChannelIds),
+    )).orderBy(desc(schema.messages.seq)).limit(10_000) : [];
+    const graphMessageById = new Map(graphMessages.map((message) => [message.id, message]));
+    const mentionRows = graphMessages.length ? await db.select({
+      messageId: schema.messageMentions.messageId,
+      mentionType: schema.messageMentions.mentionType,
+      mentionId: schema.messageMentions.mentionId,
+    }).from(schema.messageMentions).where(inArray(schema.messageMentions.messageId, graphMessages.map((message) => message.id))) : [];
+    type GraphMemberType = "human" | "agent";
+    const graphType = (type: string | null): GraphMemberType | null => type === "user" ? "human" : type === "agent" ? "agent" : null;
+    const validMember = (type: GraphMemberType, id: string) => type === "human" ? validHumans.has(id) : validAgents.has(id);
+    const interactions = new Map<string, { sourceType: GraphMemberType; sourceId: string; targetType: GraphMemberType; targetId: string; weight: number }>();
+    const interactionEvents = new Set<string>();
+    const addInteraction = (sourceType: GraphMemberType | null, sourceId: string | null, targetType: GraphMemberType | null, targetId: string | null, eventId: string) => {
+      if (!sourceType || !sourceId || !targetType || !targetId || !validMember(sourceType, sourceId) || !validMember(targetType, targetId)) return;
+      const endpoints = [`${sourceType}:${sourceId}`, `${targetType}:${targetId}`].sort();
+      if (endpoints[0] === endpoints[1]) return;
+      const eventKey = `${eventId}:${endpoints[0]}:${endpoints[1]}`;
+      if (interactionEvents.has(eventKey)) return;
+      interactionEvents.add(eventKey);
+      const pairKey = `${endpoints[0]}|${endpoints[1]}`;
+      const [source, target] = endpoints.map((endpoint) => endpoint.split(":")) as [[GraphMemberType, string], [GraphMemberType, string]];
+      const existing = interactions.get(pairKey);
+      if (existing) existing.weight++;
+      else interactions.set(pairKey, { sourceType: source[0], sourceId: source[1], targetType: target[0], targetId: target[1], weight: 1 });
+    };
+    for (const mention of mentionRows) {
+      const message = graphMessageById.get(mention.messageId);
+      if (message) addInteraction(graphType(message.senderType), message.senderId, graphType(mention.mentionType), mention.mentionId, message.id);
+    }
+    for (const message of graphMessages) {
+      const sourceType = graphType(message.senderType);
+      if (message.replyToMessageId) {
+        const target = graphMessageById.get(message.replyToMessageId) ?? parentById.get(message.replyToMessageId);
+        if (target) addInteraction(sourceType, message.senderId, graphType(target.senderType), target.senderId, message.id);
+      }
+      const threadParent = threadParentByChannel.get(message.channelId);
+      if (threadParent) addInteraction(sourceType, message.senderId, graphType(threadParent.senderType), threadParent.senderId, message.id);
+      addInteraction(sourceType, message.senderId, graphType(message.taskAssigneeType), message.taskAssigneeId, message.id);
+    }
     return (sendJson(res, 200, {
       humans: humanRows.map((human) => ({ ...human, type: "human" })),
       agents: agentRows.map((agent) => ({ ...agent, type: "agent", status: agent.activity && agent.activity !== "offline" ? agent.activity : agent.status })),
@@ -156,6 +221,7 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
         if (memberType === "agent" && validAgents.has(membership.memberId)) return [{ ...membership, memberType }];
         return [];
       }),
+      interactions: [...interactions.values()],
     }), true);
   }
   // /channels only lists regular/private channels (bare array, no unread); DMs go through /channels/dm; unread counts through /channels/unread

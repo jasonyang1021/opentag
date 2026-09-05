@@ -86,7 +86,7 @@
     "graphConnectionCount": "{{count}} 个连接",
     "graphMostConnected": "连接最多",
     "graphLargestChannels": "最大频道",
-    "graphSharedChannels": "共同加入 {{count}} 个频道",
+    "graphInteractionCount": "{{count}} 次协作互动",
     "graphAriaLabel": "工作区成员关系图",
     "graphZoomIn": "放大",
     "graphZoomOut": "缩小",

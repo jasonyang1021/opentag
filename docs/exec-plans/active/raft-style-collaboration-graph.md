@@ -7,7 +7,7 @@ Make Graph a first-class Members navigation destination and render the workspace
 ## Scope
 
 - Move Graph from the Members header toggle to the top of the Members sidebar.
-- Project human/agent channel memberships into unique member-to-member links.
+- Project visibility-safe mentions, replies, thread participation, and task assignments into unique weighted member-to-member links; keep channel membership for summary counts only.
 - Use a deterministic force layout with hover focus, pan, zoom, reset, refresh, and member navigation.
 - Show Raft-style totals, most-connected members, and largest-channel summaries.
 - Preserve the existing visibility-scoped graph API and its private-channel guarantees.

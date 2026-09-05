@@ -19,22 +19,25 @@ const data: CollaborationGraphData = {
     { channelId: "c2", memberType: "human", memberId: "u1" },
     { channelId: "c2", memberType: "agent", memberId: "a1" },
   ],
+  interactions: [
+    { sourceType: "human", sourceId: "u1", targetType: "agent", targetId: "a1", weight: 5 },
+    { sourceType: "agent", sourceId: "a1", targetType: "agent", targetId: "a2", weight: 2 },
+  ],
 };
 
-test("member graph projects shared channels into unique weighted member links", () => {
+test("member graph projects interaction evidence into weighted member links", () => {
   const graph = buildMemberGraph(data);
   assert.equal(graph.nodes.length, 3);
-  assert.equal(graph.edges.length, 3);
+  assert.equal(graph.edges.length, 2);
   const shared = graph.edges.find((edge) => edge.sourceKey === "agent:a1" && edge.targetKey === "human:u1");
-  assert.deepEqual(shared?.channelIds, ["c1", "c2"]);
-  assert.equal(shared?.weight, 2);
-  assert.equal(graph.nodes.find((node) => node.id === "u1")?.connections, 2);
+  assert.equal(shared?.weight, 5);
+  assert.equal(graph.nodes.find((node) => node.id === "u1")?.connections, 1);
 });
 
 test("member focus includes direct collaborators and deterministic layout stays in bounds", () => {
   const graph = buildMemberGraph(data);
   const keys = connectedMemberKeys(data.humans[0]!, graph.edges);
-  assert.deepEqual([...keys].sort(), ["agent:a1", "agent:a2", "human:u1"]);
+  assert.deepEqual([...keys].sort(), ["agent:a1", "human:u1"]);
   const first = layoutMemberGraph(graph.nodes, graph.edges, 600, 400);
   const second = layoutMemberGraph(graph.nodes, graph.edges, 600, 400);
   assert.deepEqual(first, second);

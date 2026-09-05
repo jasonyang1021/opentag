@@ -20,6 +20,15 @@ export interface CollaborationGraphData {
   agents: CollaborationNode[];
   channels: CollaborationNode[];
   memberships: CollaborationMembership[];
+  interactions: CollaborationInteraction[];
+}
+
+export interface CollaborationInteraction {
+  sourceType: "human" | "agent";
+  sourceId: string;
+  targetType: "human" | "agent";
+  targetId: string;
+  weight: number;
 }
 
 export interface MemberConnection {
@@ -49,38 +58,16 @@ export interface ChannelSummary {
 export const memberNodeKey = (node: Pick<CollaborationNode, "type" | "id">) => `${node.type}:${node.id}`;
 
 /**
- * Channels define collaboration, but the visible graph is people + agents. Two
- * members share one edge when they belong to at least one common visible channel.
+ * The visible graph is people + agents. Server-side interaction evidence (mentions,
+ * replies, thread participation, and assignments) becomes a weighted undirected edge.
  */
 export function buildMemberGraph(data: CollaborationGraphData) {
   const sourceNodes = [...data.humans, ...data.agents];
   const nodesByKey = new Map(sourceNodes.map((node) => [memberNodeKey(node), node]));
-  const membersByChannel = new Map<string, string[]>();
-  for (const membership of data.memberships) {
-    const key = `${membership.memberType}:${membership.memberId}`;
-    if (!nodesByKey.has(key)) continue;
-    const members = membersByChannel.get(membership.channelId) ?? [];
-    if (!members.includes(key)) members.push(key);
-    membersByChannel.set(membership.channelId, members);
-  }
-
-  const edgeChannels = new Map<string, Set<string>>();
-  for (const [channelId, members] of membersByChannel) {
-    const sorted = [...members].sort();
-    for (let i = 0; i < sorted.length; i++) {
-      for (let j = i + 1; j < sorted.length; j++) {
-        const pairKey = `${sorted[i]}|${sorted[j]}`;
-        const channels = edgeChannels.get(pairKey) ?? new Set<string>();
-        channels.add(channelId);
-        edgeChannels.set(pairKey, channels);
-      }
-    }
-  }
-
-  const edges: MemberConnection[] = [...edgeChannels.entries()].map(([pairKey, channelIds]) => {
-    const [sourceKey, targetKey] = pairKey.split("|");
-    const channels = [...channelIds].sort();
-    return { sourceKey: sourceKey!, targetKey: targetKey!, channelIds: channels, weight: channels.length };
+  const edges: MemberConnection[] = data.interactions.flatMap((interaction) => {
+    const endpoints = [`${interaction.sourceType}:${interaction.sourceId}`, `${interaction.targetType}:${interaction.targetId}`].sort();
+    if (endpoints[0] === endpoints[1] || !nodesByKey.has(endpoints[0]!) || !nodesByKey.has(endpoints[1]!)) return [];
+    return [{ sourceKey: endpoints[0]!, targetKey: endpoints[1]!, channelIds: [], weight: Math.max(1, interaction.weight) }];
   });
   const degree = new Map<string, number>();
   for (const edge of edges) {

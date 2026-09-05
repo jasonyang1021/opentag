@@ -86,7 +86,7 @@
     "graphConnectionCount": "{{count}} connections",
     "graphMostConnected": "Most connected",
     "graphLargestChannels": "Largest channels",
-    "graphSharedChannels": "{{count}} shared channels",
+    "graphInteractionCount": "{{count}} collaboration interactions",
     "graphAriaLabel": "Workspace member connection graph",
     "graphZoomIn": "Zoom in",
     "graphZoomOut": "Zoom out",
