@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, ChevronRight, Check, Copy, Eye, EyeOff } from "lucide-react";
+import { MessageCircle, X, ChevronRight, Check, Copy, Eye, EyeOff, Network } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -41,15 +41,10 @@ export function Members() {
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const { agentId, userId } = useParams();
   const nav = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [modal, setModal] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const directoryView = searchParams.get("view") === "graph" ? "graph" : "list";
-  const setDirectoryView = (view: "list" | "graph") => setSearchParams((current) => {
-    const next = new URLSearchParams(current);
-    if (view === "graph") next.set("view", "graph"); else next.delete("view");
-    return next;
-  });
 
   const byMachine: Record<string, typeof agents> = {};
   for (const a of agents) { const k = a.machineId || "_none"; (byMachine[k] = byMachine[k] || []).push(a); }
@@ -60,6 +55,9 @@ export function Members() {
       <aside className="sidebar">
         <div className="sb-scroll">
         <div className="sb-title">{t("nav.members")}</div>
+        <button className={`item member-graph-nav${!agentId && !userId && directoryView === "graph" ? " active" : ""}`} onClick={() => nav(`/s/${slug}/agent?view=graph`)}>
+          <Network size={16} /><span className="grow">{t("members.viewGraph")}</span>
+        </button>
         <div className="sec">{t("common.agents")} <span className="cnt">{agents.length}</span>{capabilities.manageAgents && <button className="addbtn" title={t("members.createAgent")} onClick={() => setModal(true)}>+</button>}</div>
         {Object.keys(byMachine).map((k) => (
           <div key={k}>
@@ -81,13 +79,9 @@ export function Members() {
       </aside>
       <main className="content-col">
         {userId ? <HumanProfile uid={userId} /> : agentId ? <AgentProfile key={agentId} id={agentId} onDeleted={() => nav(`/s/${slug}/agent`)} /> : <>
-          <div className="head member-directory-head">
+          {directoryView === "graph" ? <div className="head member-directory-head graph-head"><Network size={20} /><h1>{t("members.viewGraph")}</h1><span>{t("members.graphExperimental")}</span></div> : <div className="head member-directory-head">
             <div><h1>{t("nav.members")}</h1><small>{t("common.membersCount", { count: agents.length + humans.length })}</small></div>
-            <div className="seg-pill member-view-switch" role="group" aria-label={t("members.viewMode")}>
-              <button className={`seg-opt${directoryView === "list" ? " on" : ""}`} onClick={() => setDirectoryView("list")}>{t("members.viewList")}</button>
-              <button className={`seg-opt${directoryView === "graph" ? " on" : ""}`} onClick={() => setDirectoryView("graph")}>{t("members.viewGraph")}</button>
-            </div>
-          </div>
+          </div>}
           {directoryView === "graph" ? <CollaborationGraph /> : <Roster agents={agents} humans={humans} onCreate={() => setModal(true)} canCreate={!!capabilities.manageAgents} />}
         </>}
       </main>

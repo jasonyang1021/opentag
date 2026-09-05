@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
-import { Bot, Hash, Search, UserRound } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Hash, Maximize2, RefreshCw, ZoomIn, ZoomOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { useStore } from "../store.tsx";
 import {
-  connectedNodeKeys,
-  layoutCollaborationGraph,
+  buildMemberGraph,
+  connectedMemberKeys,
+  layoutMemberGraph,
+  memberNodeKey,
+  summarizeChannels,
   type CollaborationGraphData,
-  type CollaborationNode,
-  type CollaborationNodeType,
+  type MemberGraphNode,
 } from "../lib/collaborationGraph.ts";
 
 const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [] };
-const nodeKey = (node: CollaborationNode) => `${node.type}:${node.id}`;
+const GRAPH_WIDTH = 1040;
+const GRAPH_HEIGHT = 640;
 
 export function CollaborationGraph() {
   const { t } = useTranslation();
@@ -21,9 +24,9 @@ export function CollaborationGraph() {
   const navigate = useNavigate();
   const [data, setData] = useState<CollaborationGraphData | null>(null);
   const [failed, setFailed] = useState(false);
-  const [query, setQuery] = useState("");
-  const [visible, setVisible] = useState<Set<CollaborationNodeType>>(new Set(["human", "channel", "agent"]));
-  const [focused, setFocused] = useState<CollaborationNode | null>(null);
+  const [focused, setFocused] = useState<MemberGraphNode | null>(null);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+  const drag = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
 
   const load = async () => {
     setFailed(false);
@@ -38,83 +41,92 @@ export function CollaborationGraph() {
   };
   useEffect(() => { void load(); }, []);
 
-  const filtered = useMemo(() => {
-    const source = data ?? EMPTY;
-    const q = query.trim().toLocaleLowerCase();
-    if (!q) return source;
-    const matches = (node: CollaborationNode) => `${node.displayName || ""} ${node.name}`.toLocaleLowerCase().includes(q);
-    const humans = source.humans.filter(matches);
-    const agents = source.agents.filter(matches);
-    const directChannels = source.channels.filter(matches);
-    const memberKeys = new Set([...humans, ...agents].map(nodeKey));
-    const relatedChannelIds = new Set(source.memberships.filter((membership) => memberKeys.has(`${membership.memberType}:${membership.memberId}`)).map((membership) => membership.channelId));
-    const channels = source.channels.filter((channel) => directChannels.some((match) => match.id === channel.id) || relatedChannelIds.has(channel.id));
-    const channelIds = new Set(channels.map((channel) => channel.id));
-    const directlyMatchedChannelIds = new Set(directChannels.map((channel) => channel.id));
-    const channelMemberKeys = new Set(source.memberships.filter((membership) => directlyMatchedChannelIds.has(membership.channelId)).map((membership) => `${membership.memberType}:${membership.memberId}`));
-    return {
-      humans: source.humans.filter((human) => humans.some((match) => match.id === human.id) || channelMemberKeys.has(nodeKey(human))),
-      agents: source.agents.filter((agent) => agents.some((match) => match.id === agent.id) || channelMemberKeys.has(nodeKey(agent))),
-      channels,
-      memberships: source.memberships.filter((membership) => channelIds.has(membership.channelId)),
-    };
-  }, [data, query]);
-  const layout = useMemo(() => layoutCollaborationGraph(filtered, visible), [filtered, visible]);
-  const positions = useMemo(() => new Map(layout.nodes.map((node) => [nodeKey(node), node])), [layout.nodes]);
-  const connected = useMemo(() => focused ? connectedNodeKeys(focused, layout.memberships) : null, [focused, layout.memberships]);
-  const toggle = (type: CollaborationNodeType) => setVisible((current) => {
-    const next = new Set(current);
-    if (next.has(type)) next.delete(type); else next.add(type);
-    return next;
-  });
-  const open = (node: CollaborationNode) => {
-    if (node.type === "channel") navigate(`/s/${slug}/channel/${node.id}`);
-    else if (node.type === "agent") navigate(`/s/${slug}/agent/${node.id}`);
-    else navigate(`/s/${slug}/human/${node.id}`);
-  };
-  const top = [...layout.nodes].filter((node) => node.type !== "channel").sort((a, b) => b.connections - a.connections).slice(0, 5);
+  const graph = useMemo(() => buildMemberGraph(data ?? EMPTY), [data]);
+  const positioned = useMemo(() => layoutMemberGraph(graph.nodes, graph.edges, GRAPH_WIDTH, GRAPH_HEIGHT), [graph]);
+  const positions = useMemo(() => new Map(positioned.map((node) => [memberNodeKey(node), node])), [positioned]);
+  const connected = useMemo(() => focused ? connectedMemberKeys(focused, graph.edges) : null, [focused, graph.edges]);
+  const mostConnected = useMemo(() => [...graph.nodes].sort((a, b) => b.connections - a.connections || (a.displayName || a.name).localeCompare(b.displayName || b.name)).slice(0, 6), [graph.nodes]);
+  const largestChannels = useMemo(() => summarizeChannels(data ?? EMPTY), [data]);
+
+  const openMember = (node: MemberGraphNode) => navigate(node.type === "agent" ? `/s/${slug}/agent/${node.id}` : `/s/${slug}/human/${node.id}`);
+  const setScale = (next: number) => setViewport((current) => ({ ...current, scale: Math.max(0.65, Math.min(1.8, next)) }));
+  const resetViewport = () => setViewport({ x: 0, y: 0, scale: 1 });
 
   return (
     <div className="collab-wrap">
       <div className="collab-toolbar">
-        <label className="collab-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("members.graphSearch")} /></label>
-        <div className="collab-filters" aria-label={t("members.graphFilters")}>{(["human", "agent", "channel"] as const).map((type) => (
-          <button key={type} className={visible.has(type) ? "on" : ""} aria-pressed={visible.has(type)} onClick={() => toggle(type)}>
-            {type === "human" ? <UserRound size={14} /> : type === "agent" ? <Bot size={14} /> : <Hash size={14} />}{t(`members.graphType.${type}`)}
-          </button>
-        ))}</div>
-        <button className="joinbtn" onClick={load}>{t("members.graphRefresh")}</button>
+        <div className="collab-connection-total"><span />{t("members.graphConnections")} <b>{graph.nodes.length}</b></div>
+        <div className="collab-toolbar-actions">
+          <button title={t("members.graphZoomOut")} aria-label={t("members.graphZoomOut")} onClick={() => setScale(viewport.scale - 0.15)}><ZoomOut size={15} /></button>
+          <button title={t("members.graphResetView")} aria-label={t("members.graphResetView")} onClick={resetViewport}><Maximize2 size={14} /></button>
+          <button title={t("members.graphZoomIn")} aria-label={t("members.graphZoomIn")} onClick={() => setScale(viewport.scale + 0.15)}><ZoomIn size={15} /></button>
+          <button className="collab-refresh" onClick={load}><RefreshCw size={14} />{t("members.graphRefresh")}</button>
+        </div>
       </div>
-      <div className="collab-stats">
-        <span><b>{data?.humans.length ?? 0}</b>{t("common.humans")}</span>
-        <span><b>{data?.agents.length ?? 0}</b>{t("common.agents")}</span>
-        <span><b>{data?.channels.length ?? 0}</b>{t("members.graphChannels")}</span>
-        <span><b>{data?.memberships.length ?? 0}</b>{t("members.graphConnections")}</span>
-      </div>
-      {!data ? <div className="empty">{t("members.loading")}</div> : failed ? <div className="empty">{t("members.graphLoadFailed")} <button className="joinbtn" onClick={load}>{t("members.graphRetry")}</button></div> : layout.nodes.length === 0 ? <div className="empty">{t("members.graphEmpty")}</div> : (
+      {!data ? <div className="empty">{t("members.loading")}</div> : failed ? <div className="empty">{t("members.graphLoadFailed")} <button className="joinbtn" onClick={load}>{t("members.graphRetry")}</button></div> : graph.nodes.length === 0 ? <div className="empty">{t("members.graphEmpty")}</div> : (
         <div className="collab-body">
-          <div className="collab-canvas" style={{ minHeight: layout.height }}>
-            <svg viewBox={`0 0 100 ${layout.height}`} preserveAspectRatio="none" aria-hidden="true">
-              {layout.memberships.map((membership) => {
-                const member = positions.get(`${membership.memberType}:${membership.memberId}`);
-                const channel = positions.get(`channel:${membership.channelId}`);
-                if (!member || !channel) return null;
-                const edgeActive = !connected || (connected.has(nodeKey(member)) && connected.has(nodeKey(channel)));
-                const bend = (member.x + channel.x) / 2;
-                return <path key={`${membership.channelId}:${membership.memberType}:${membership.memberId}`} className={edgeActive ? "active" : "dim"} d={`M ${member.x} ${member.y} C ${bend} ${member.y}, ${bend} ${channel.y}, ${channel.x} ${channel.y}`} />;
+          <div
+            className={`collab-canvas${drag.current ? " dragging" : ""}`}
+            onWheel={(event) => { event.preventDefault(); setScale(viewport.scale + (event.deltaY < 0 ? 0.1 : -0.1)); }}
+            onPointerDown={(event) => {
+              if ((event.target as HTMLElement).closest("button")) return;
+              drag.current = { x: event.clientX, y: event.clientY, originX: viewport.x, originY: viewport.y };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (!drag.current) return;
+              setViewport((current) => ({ ...current, x: drag.current!.originX + event.clientX - drag.current!.x, y: drag.current!.originY + event.clientY - drag.current!.y }));
+            }}
+            onPointerUp={(event) => { drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); }}
+            onPointerCancel={() => { drag.current = null; }}
+          >
+            <div className="collab-stage" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}>
+              <svg viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`} preserveAspectRatio="none" aria-label={t("members.graphAriaLabel")}>
+                {graph.edges.map((edge) => {
+                  const source = positions.get(edge.sourceKey);
+                  const target = positions.get(edge.targetKey);
+                  if (!source || !target) return null;
+                  const active = !focused || edge.sourceKey === memberNodeKey(focused) || edge.targetKey === memberNodeKey(focused);
+                  return <line key={`${edge.sourceKey}:${edge.targetKey}`} className={active ? "active" : "dim"} x1={source.x} y1={source.y} x2={target.x} y2={target.y} style={{ strokeWidth: Math.min(2.2, 0.65 + edge.weight * 0.22) }}><title>{t("members.graphSharedChannels", { count: edge.weight })}</title></line>;
+                })}
+              </svg>
+              {positioned.map((node) => {
+                const key = memberNodeKey(node);
+                const isFocused = focused && memberNodeKey(focused) === key;
+                const isDim = !!connected && !connected.has(key);
+                return <button
+                  key={key}
+                  className={`collab-node ${node.type}${isFocused ? " focused" : ""}${isDim ? " dim" : ""}`}
+                  style={{ left: `${node.x / GRAPH_WIDTH * 100}%`, top: `${node.y / GRAPH_HEIGHT * 100}%` }}
+                  onMouseEnter={() => setFocused(node)} onMouseLeave={() => setFocused(null)} onFocus={() => setFocused(node)} onBlur={() => setFocused(null)}
+                  onClick={() => openMember(node)} title={`${node.displayName || node.name} · ${t("members.graphConnectionCount", { count: node.connections })}`}
+                >
+                  <span className="collab-node-avatar"><Avatar seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={38} /></span>
+                  <span className="collab-node-name">{node.displayName || node.name}</span>
+                  {node.type === "agent" && <span className={`dot ${node.status || "inactive"}`} />}
+                </button>;
               })}
-            </svg>
-            {layout.nodes.map((node) => {
-              const isFocused = focused && nodeKey(focused) === nodeKey(node);
-              const isDim = !!connected && !connected.has(nodeKey(node));
-              return <button key={nodeKey(node)} className={`collab-node ${node.type}${isFocused ? " focused" : ""}${isDim ? " dim" : ""}`} style={{ left: `${node.x}%`, top: node.y }} onMouseEnter={() => setFocused(node)} onMouseLeave={() => setFocused(null)} onFocus={() => setFocused(node)} onBlur={() => setFocused(null)} onClick={() => open(node)} title={`${node.displayName || node.name} · ${t("members.graphConnectionCount", { count: node.connections })}`}>
-                {node.type === "channel" ? <span className="collab-channel-icon"><Hash size={14} /></span> : <Avatar seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={28} />}
-                <span className="collab-node-copy"><b>{node.displayName || node.name}</b><small>{node.type === "agent" ? `@${node.name}` : t("members.graphConnectionCount", { count: node.connections })}</small></span>
-                {node.type === "agent" && <span className={`dot ${node.status || "inactive"}`} />}
-              </button>;
-            })}
+            </div>
           </div>
-          <aside className="collab-ranking"><h3>{t("members.graphMostConnected")}</h3>{top.map((node, index) => <button key={nodeKey(node)} onClick={() => open(node)}><span>{index + 1}</span><b>{node.displayName || node.name}</b><em>{node.connections}</em></button>)}</aside>
+          <aside className="collab-insights">
+            <div className="collab-stats">
+              <span><b>{data.humans.length}</b><small>{t("common.humans")}</small></span>
+              <span><b>{data.agents.length}</b><small>{t("common.agents")}</small></span>
+              <span><b>{graph.edges.length}</b><small>{t("members.graphLinks")}</small></span>
+            </div>
+            <section className="collab-ranking">
+              <h3>{t("members.graphMostConnected")}</h3>
+              {mostConnected.map((node, index) => <button key={memberNodeKey(node)} onClick={() => openMember(node)}>
+                <span>{index + 1}</span><Avatar seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={20} /><b>{node.displayName || node.name}</b><em>{node.connections}</em>
+              </button>)}
+            </section>
+            <section className="collab-ranking collab-channels">
+              <h3>{t("members.graphLargestChannels")}</h3>
+              {largestChannels.map((channel) => <button key={channel.id} onClick={() => navigate(`/s/${slug}/channel/${channel.id}`)}>
+                <Hash size={14} /><b>{channel.name}</b><em>{channel.humanCount}H/{channel.agentCount}A</em>
+              </button>)}
+            </section>
+          </aside>
         </div>
       )}
     </div>

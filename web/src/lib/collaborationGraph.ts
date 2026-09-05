@@ -22,55 +22,164 @@ export interface CollaborationGraphData {
   memberships: CollaborationMembership[];
 }
 
-export interface PositionedCollaborationNode extends CollaborationNode {
-  x: number;
-  y: number;
+export interface MemberConnection {
+  sourceKey: string;
+  targetKey: string;
+  channelIds: string[];
+  weight: number;
+}
+
+export interface MemberGraphNode extends CollaborationNode {
   connections: number;
 }
 
-const columnX: Record<CollaborationNodeType, number> = { human: 15, channel: 50, agent: 85 };
-
-/** Stable three-column layout: humans → channels → agents. It stays readable at large team sizes and needs no animation library. */
-export function layoutCollaborationGraph(data: CollaborationGraphData, visible: Set<CollaborationNodeType>) {
-  const nodes = [...data.humans, ...data.channels, ...data.agents].filter((node) => visible.has(node.type));
-  const keys = new Set(nodes.map((node) => `${node.type}:${node.id}`));
-  const memberships = data.memberships.filter((membership) =>
-    keys.has(`channel:${membership.channelId}`) && keys.has(`${membership.memberType}:${membership.memberId}`));
-  const degree = new Map<string, number>();
-  for (const membership of memberships) {
-    const memberKey = `${membership.memberType}:${membership.memberId}`;
-    const channelKey = `channel:${membership.channelId}`;
-    degree.set(memberKey, (degree.get(memberKey) ?? 0) + 1);
-    degree.set(channelKey, (degree.get(channelKey) ?? 0) + 1);
-  }
-  const byType = (type: CollaborationNodeType) => nodes
-    .filter((node) => node.type === type)
-    .sort((a, b) => (degree.get(`${b.type}:${b.id}`) ?? 0) - (degree.get(`${a.type}:${a.id}`) ?? 0)
-      || (a.displayName || a.name).localeCompare(b.displayName || b.name));
-  const largestColumn = Math.max(1, ...(["human", "channel", "agent"] as const).map((type) => byType(type).length));
-  const height = Math.max(560, largestColumn * 58 + 80);
-  const positioned: PositionedCollaborationNode[] = [];
-  for (const type of ["human", "channel", "agent"] as const) {
-    const group = byType(type);
-    const gap = height / (group.length + 1);
-    group.forEach((node, index) => positioned.push({
-      ...node,
-      x: columnX[type],
-      y: gap * (index + 1),
-      connections: degree.get(`${node.type}:${node.id}`) ?? 0,
-    }));
-  }
-  return { nodes: positioned, memberships, height };
+export interface PositionedMemberGraphNode extends MemberGraphNode {
+  x: number;
+  y: number;
 }
 
-export function connectedNodeKeys(node: CollaborationNode, memberships: CollaborationMembership[]) {
-  const ownKey = `${node.type}:${node.id}`;
+export interface ChannelSummary {
+  id: string;
+  name: string;
+  humanCount: number;
+  agentCount: number;
+  total: number;
+}
+
+export const memberNodeKey = (node: Pick<CollaborationNode, "type" | "id">) => `${node.type}:${node.id}`;
+
+/**
+ * Channels define collaboration, but the visible graph is people + agents. Two
+ * members share one edge when they belong to at least one common visible channel.
+ */
+export function buildMemberGraph(data: CollaborationGraphData) {
+  const sourceNodes = [...data.humans, ...data.agents];
+  const nodesByKey = new Map(sourceNodes.map((node) => [memberNodeKey(node), node]));
+  const membersByChannel = new Map<string, string[]>();
+  for (const membership of data.memberships) {
+    const key = `${membership.memberType}:${membership.memberId}`;
+    if (!nodesByKey.has(key)) continue;
+    const members = membersByChannel.get(membership.channelId) ?? [];
+    if (!members.includes(key)) members.push(key);
+    membersByChannel.set(membership.channelId, members);
+  }
+
+  const edgeChannels = new Map<string, Set<string>>();
+  for (const [channelId, members] of membersByChannel) {
+    const sorted = [...members].sort();
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 1; j < sorted.length; j++) {
+        const pairKey = `${sorted[i]}|${sorted[j]}`;
+        const channels = edgeChannels.get(pairKey) ?? new Set<string>();
+        channels.add(channelId);
+        edgeChannels.set(pairKey, channels);
+      }
+    }
+  }
+
+  const edges: MemberConnection[] = [...edgeChannels.entries()].map(([pairKey, channelIds]) => {
+    const [sourceKey, targetKey] = pairKey.split("|");
+    const channels = [...channelIds].sort();
+    return { sourceKey: sourceKey!, targetKey: targetKey!, channelIds: channels, weight: channels.length };
+  });
+  const degree = new Map<string, number>();
+  for (const edge of edges) {
+    degree.set(edge.sourceKey, (degree.get(edge.sourceKey) ?? 0) + 1);
+    degree.set(edge.targetKey, (degree.get(edge.targetKey) ?? 0) + 1);
+  }
+  const nodes: MemberGraphNode[] = sourceNodes.map((node) => ({ ...node, connections: degree.get(memberNodeKey(node)) ?? 0 }));
+  return { nodes, edges };
+}
+
+export function summarizeChannels(data: CollaborationGraphData, limit = 6): ChannelSummary[] {
+  const counts = new Map(data.channels.map((channel) => [channel.id, { humanCount: 0, agentCount: 0 }]));
+  for (const membership of data.memberships) {
+    const count = counts.get(membership.channelId);
+    if (!count) continue;
+    if (membership.memberType === "human") count.humanCount++;
+    else count.agentCount++;
+  }
+  return data.channels.map((channel) => {
+    const count = counts.get(channel.id) ?? { humanCount: 0, agentCount: 0 };
+    return { id: channel.id, name: channel.name, ...count, total: count.humanCount + count.agentCount };
+  }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)).slice(0, limit);
+}
+
+const hash = (value: string) => {
+  let result = 2166136261;
+  for (let i = 0; i < value.length; i++) result = Math.imul(result ^ value.charCodeAt(i), 16777619);
+  return result >>> 0;
+};
+
+/** Deterministic force layout keeps refreshes stable while clustering linked members. */
+export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnection[], width = 1040, height = 640): PositionedMemberGraphNode[] {
+  if (nodes.length === 0) return [];
+  if (nodes.length === 1) return [{ ...nodes[0]!, x: width / 2, y: height / 2 }];
+  const ordered = [...nodes].sort((a, b) => memberNodeKey(a).localeCompare(memberNodeKey(b)));
+  const radius = Math.min(width, height) * 0.34;
+  const positions = ordered.map((node, index) => {
+    const angle = index * 2.399963229728653 + (hash(memberNodeKey(node)) % 97) / 97;
+    const band = 0.66 + ((hash(node.id) >>> 8) % 34) / 100;
+    return { node, x: width / 2 + Math.cos(angle) * radius * band, y: height / 2 + Math.sin(angle) * radius * band, vx: 0, vy: 0 };
+  });
+  const indexByKey = new Map(positions.map((position, index) => [memberNodeKey(position.node), index]));
+  const indexedEdges = edges.flatMap((edge) => {
+    const source = indexByKey.get(edge.sourceKey);
+    const target = indexByKey.get(edge.targetKey);
+    return source === undefined || target === undefined ? [] : [{ ...edge, source, target }];
+  });
+
+  for (let iteration = 0; iteration < 220; iteration++) {
+    const cooling = 1 - iteration / 250;
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const a = positions[i]!;
+        const b = positions[j]!;
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < 1) {
+          dx = ((hash(a.node.id + b.node.id) % 11) - 5) / 5;
+          dy = ((hash(b.node.id + a.node.id) % 11) - 5) / 5;
+          distanceSquared = dx * dx + dy * dy || 1;
+        }
+        const distance = Math.sqrt(distanceSquared);
+        const force = Math.min(2.8, 5200 / distanceSquared) * cooling;
+        const fx = force * dx / distance;
+        const fy = force * dy / distance;
+        a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+      }
+    }
+    for (const edge of indexedEdges) {
+      const source = positions[edge.source]!;
+      const target = positions[edge.target]!;
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+      const desired = Math.max(72, 126 - Math.min(edge.weight, 4) * 10);
+      const force = (distance - desired) * 0.009 * cooling;
+      const fx = force * dx / distance;
+      const fy = force * dy / distance;
+      source.vx += fx; source.vy += fy; target.vx -= fx; target.vy -= fy;
+    }
+    for (const position of positions) {
+      position.vx += (width / 2 - position.x) * 0.0025;
+      position.vy += (height / 2 - position.y) * 0.0025;
+      position.vx *= 0.82;
+      position.vy *= 0.82;
+      position.x = Math.max(42, Math.min(width - 42, position.x + position.vx));
+      position.y = Math.max(42, Math.min(height - 42, position.y + position.vy));
+    }
+  }
+  return positions.map(({ node, x, y }) => ({ ...node, x, y }));
+}
+
+export function connectedMemberKeys(node: Pick<CollaborationNode, "type" | "id">, edges: MemberConnection[]) {
+  const ownKey = memberNodeKey(node);
   const keys = new Set([ownKey]);
-  for (const membership of memberships) {
-    const memberKey = `${membership.memberType}:${membership.memberId}`;
-    const channelKey = `channel:${membership.channelId}`;
-    if (ownKey === memberKey) keys.add(channelKey);
-    if (ownKey === channelKey) keys.add(memberKey);
+  for (const edge of edges) {
+    if (edge.sourceKey === ownKey) keys.add(edge.targetKey);
+    if (edge.targetKey === ownKey) keys.add(edge.sourceKey);
   }
   return keys;
 }
