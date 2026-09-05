@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildMemberGraph,
   connectedMemberKeys,
+  edgeCurveOffsets,
   layoutMemberGraph,
   MAX_VISIBLE_EDGE_STRANDS,
   summarizeChannels,
@@ -43,6 +44,8 @@ test("curve bundles show exact normal counts and cap pathological histories", ()
   assert.equal(visibleEdgeStrandCount(7), 7);
   assert.equal(visibleEdgeStrandCount(1), 1);
   assert.equal(visibleEdgeStrandCount(10_000), MAX_VISIBLE_EDGE_STRANDS);
+  assert.deepEqual(edgeCurveOffsets(3, 1), [24, 29.2, 34.4]);
+  assert.ok(edgeCurveOffsets(24, -1).every((offset) => offset <= -24));
 });
 
 test("member focus includes direct collaborators and deterministic layout stays in bounds", () => {
@@ -53,6 +56,16 @@ test("member focus includes direct collaborators and deterministic layout stays 
   const second = layoutMemberGraph(graph.nodes, graph.edges, 600, 400);
   assert.deepEqual(first, second);
   assert.ok(first.every((node) => node.x >= 42 && node.x <= 558 && node.y >= 42 && node.y <= 358));
+});
+
+test("layout keeps linked members central and distributes isolates around the perimeter", () => {
+  const graph = buildMemberGraph({ ...data, humans: [...data.humans, { id: "u2", type: "human", name: "observer" }] });
+  const layout = layoutMemberGraph(graph.nodes, graph.edges, 600, 400);
+  const isolated = layout.find((node) => node.id === "u2")!;
+  const linked = layout.filter((node) => node.id !== "u2");
+  const outerEllipse = ((isolated.x - 300) / 238) ** 2 + ((isolated.y - 200) / 142) ** 2;
+  assert.ok(outerEllipse >= 0.98);
+  assert.ok(linked.every((node) => node.x >= 78 && node.x <= 522 && node.y >= 52 && node.y <= 348));
 });
 
 test("largest channels report separate human and agent totals", () => {

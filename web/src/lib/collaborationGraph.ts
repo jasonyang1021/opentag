@@ -85,6 +85,13 @@ export function visibleEdgeStrandCount(weight: number) {
   return Math.min(MAX_VISIBLE_EDGE_STRANDS, Math.max(1, Math.round(weight)));
 }
 
+/** Keep every strand on the same side of its edge so bundles read as deliberate arcs. */
+export function edgeCurveOffsets(weight: number, direction: 1 | -1) {
+  const count = visibleEdgeStrandCount(weight);
+  const spacing = count > 12 ? 3.2 : count > 6 ? 4.3 : 5.2;
+  return Array.from({ length: count }, (_, index) => direction * (24 + index * spacing));
+}
+
 export function totalInteractionCount(edges: MemberConnection[]) {
   return edges.reduce((total, edge) => total + edge.weight, 0);
 }
@@ -109,16 +116,27 @@ const hash = (value: string) => {
   return result >>> 0;
 };
 
-/** Deterministic force layout keeps refreshes stable while clustering linked members. */
+/** Linked members form a roomy centre network; unlinked members occupy a stable, pseudo-random outer ring. */
 export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnection[], width = 1040, height = 640): PositionedMemberGraphNode[] {
   if (nodes.length === 0) return [];
   if (nodes.length === 1) return [{ ...nodes[0]!, x: width / 2, y: height / 2 }];
   const ordered = [...nodes].sort((a, b) => memberNodeKey(a).localeCompare(memberNodeKey(b)));
-  const radius = Math.min(width, height) * 0.34;
-  const positions = ordered.map((node, index) => {
-    const angle = index * 2.399963229728653 + (hash(memberNodeKey(node)) % 97) / 97;
-    const band = 0.66 + ((hash(node.id) >>> 8) % 34) / 100;
-    return { node, x: width / 2 + Math.cos(angle) * radius * band, y: height / 2 + Math.sin(angle) * radius * band, vx: 0, vy: 0 };
+  const connectedKeys = new Set(edges.flatMap((edge) => [edge.sourceKey, edge.targetKey]));
+  const connectedNodes = ordered.filter((node) => connectedKeys.has(memberNodeKey(node)));
+  const isolatedNodes = ordered.filter((node) => !connectedKeys.has(memberNodeKey(node))).sort((a, b) => hash(memberNodeKey(a)) - hash(memberNodeKey(b)));
+  const centreRadius = Math.min(width, height) * 0.27;
+  const positions = connectedNodes.map((node, index) => {
+    const angle = index * 2.399963229728653 + (hash(memberNodeKey(node)) % 71) / 71;
+    const band = 0.58 + ((hash(node.id) >>> 8) % 35) / 100;
+    return { node, x: width / 2 + Math.cos(angle) * centreRadius * band, y: height / 2 + Math.sin(angle) * centreRadius * band, vx: 0, vy: 0 };
+  });
+  const outerX = Math.max(42, width / 2 - 62);
+  const outerY = Math.max(42, height / 2 - 58);
+  isolatedNodes.forEach((node, index) => {
+    const slot = 2 * Math.PI / Math.max(1, isolatedNodes.length);
+    const jitter = (((hash(memberNodeKey(node)) >>> 10) % 101) / 100 - 0.5) * slot * 0.5;
+    const angle = index * slot - Math.PI / 2 + jitter;
+    positions.push({ node, x: width / 2 + Math.cos(angle) * outerX, y: height / 2 + Math.sin(angle) * outerY, vx: 0, vy: 0 });
   });
   const indexByKey = new Map(positions.map((position, index) => [memberNodeKey(position.node), index]));
   const indexedEdges = edges.flatMap((edge) => {
@@ -127,10 +145,10 @@ export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnect
     return source === undefined || target === undefined ? [] : [{ ...edge, source, target }];
   });
 
-  for (let iteration = 0; iteration < 220; iteration++) {
-    const cooling = 1 - iteration / 250;
-    for (let i = 0; i < positions.length; i++) {
-      for (let j = i + 1; j < positions.length; j++) {
+  for (let iteration = 0; iteration < 260; iteration++) {
+    const cooling = 1 - iteration / 290;
+    for (let i = 0; i < connectedNodes.length; i++) {
+      for (let j = i + 1; j < connectedNodes.length; j++) {
         const a = positions[i]!;
         const b = positions[j]!;
         let dx = b.x - a.x;
@@ -142,7 +160,7 @@ export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnect
           distanceSquared = dx * dx + dy * dy || 1;
         }
         const distance = Math.sqrt(distanceSquared);
-        const force = Math.min(2.8, 5200 / distanceSquared) * cooling;
+        const force = Math.min(3.4, 8800 / distanceSquared) * cooling;
         const fx = force * dx / distance;
         const fy = force * dy / distance;
         a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
@@ -154,19 +172,20 @@ export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnect
       const dx = target.x - source.x;
       const dy = target.y - source.y;
       const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-      const desired = Math.max(72, 126 - Math.min(edge.weight, 4) * 10);
-      const force = (distance - desired) * 0.009 * cooling;
+      const desired = Math.max(132, 172 - Math.min(edge.weight, 8) * 5);
+      const force = (distance - desired) * 0.0075 * cooling;
       const fx = force * dx / distance;
       const fy = force * dy / distance;
       source.vx += fx; source.vy += fy; target.vx -= fx; target.vy -= fy;
     }
-    for (const position of positions) {
-      position.vx += (width / 2 - position.x) * 0.0025;
-      position.vy += (height / 2 - position.y) * 0.0025;
+    for (let index = 0; index < connectedNodes.length; index++) {
+      const position = positions[index]!;
+      position.vx += (width / 2 - position.x) * 0.0015;
+      position.vy += (height / 2 - position.y) * 0.0015;
       position.vx *= 0.82;
       position.vy *= 0.82;
-      position.x = Math.max(42, Math.min(width - 42, position.x + position.vx));
-      position.y = Math.max(42, Math.min(height - 42, position.y + position.vy));
+      position.x = Math.max(width * 0.13, Math.min(width * 0.87, position.x + position.vx));
+      position.y = Math.max(height * 0.13, Math.min(height * 0.87, position.y + position.vy));
     }
   }
   return positions.map(({ node, x, y }) => ({ ...node, x, y }));

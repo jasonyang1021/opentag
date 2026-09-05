@@ -7,12 +7,12 @@ import { useStore } from "../store.tsx";
 import {
   buildMemberGraph,
   connectedMemberKeys,
+  edgeCurveOffsets,
   layoutMemberGraph,
   MAX_VISIBLE_EDGE_STRANDS,
   memberNodeKey,
   summarizeChannels,
   totalInteractionCount,
-  visibleEdgeStrandCount,
   type CollaborationGraphData,
   type MemberGraphNode,
 } from "../lib/collaborationGraph.ts";
@@ -20,7 +20,7 @@ import {
 const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [], interactions: [] };
 const GRAPH_WIDTH = 1040;
 const GRAPH_HEIGHT = 640;
-const curveSign = (value: string) => [...value].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 ? 1 : -1;
+const curveSign = (value: string): 1 | -1 => [...value].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 ? 1 : -1;
 
 export function CollaborationGraph() {
   const { t } = useTranslation();
@@ -92,16 +92,13 @@ export function CollaborationGraph() {
                   const target = positions.get(edge.targetKey);
                   if (!source || !target) return [];
                   const active = !focused || edge.sourceKey === memberNodeKey(focused) || edge.targetKey === memberNodeKey(focused);
-                  const strandCount = visibleEdgeStrandCount(edge.weight);
                   const dx = target.x - source.x;
                   const dy = target.y - source.y;
                   const distance = Math.sqrt(dx * dx + dy * dy) || 1;
                   const normalX = -dy / distance;
                   const normalY = dx / distance;
-                  const spacing = strandCount > 12 ? 2.7 : 4;
-                  const baseCurve = curveSign(`${edge.sourceKey}|${edge.targetKey}`) * 12;
-                  return Array.from({ length: strandCount }, (_, index) => {
-                    const offset = baseCurve + (index - (strandCount - 1) / 2) * spacing;
+                  const direction = curveSign(`${edge.sourceKey}|${edge.targetKey}`);
+                  return edgeCurveOffsets(edge.weight, direction).map((offset, index) => {
                     const controlX = (source.x + target.x) / 2 + normalX * offset;
                     const controlY = (source.y + target.y) / 2 + normalY * offset;
                     return <path key={`${edge.sourceKey}:${edge.targetKey}:${index}`} className={active ? "active" : "dim"} d={`M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`}><title>{t("members.graphInteractionCount", { count: edge.weight })}</title></path>;
