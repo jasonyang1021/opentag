@@ -503,7 +503,7 @@
 
 /* —— Footer —— */
 .lp-footer { border-top: 1px solid var(--lp-border); padding-block: var(--lp-space-16) var(--lp-space-12); }
-.lp-footer__grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: var(--lp-space-12); }
+.lp-footer__grid { display: block; }
 .lp-footer__brand .lp-brand { font-size: 28px; }
 .lp-footer__tagline { margin-top: var(--lp-space-4); font-size: var(--lp-text-sm); color: var(--lp-muted); max-width: 30ch; }
 .lp-footer__col h4 { font-size: var(--lp-text-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lp-muted); margin-bottom: var(--lp-space-5); }

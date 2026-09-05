@@ -3,7 +3,7 @@
 // "Enter workspace" routes to the app (/s/:slug/channel) when signed in, else to /login.
 // Copy claims only capabilities verified in README.
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   AtSign, Network, ListChecks, Clock, ScanEye, Moon, BookMarked, Inbox, Boxes,
   ArrowRight, MessagesSquare, BrainCircuit, ShieldCheck,
@@ -12,22 +12,12 @@ import { useStore } from "../store.tsx";
 import { COPY as FEATURE_COPY, currentLang, type Lang } from "./Features.tsx";
 import { ProductMock } from "./ProductMock.tsx";
 import { MarketingNav, PublicBrand } from "../landing/MarketingNav.tsx";
-import { GITHUB_URL, resolveDocsHref } from "../landing/publicNav.ts";
 import "../landing/landing.css";
 
 function detectLandingLang(): Lang {
   if (typeof window === "undefined") return "en";
   const saved = window.localStorage?.getItem("open-tag.lang");
   return currentLang(saved || window.navigator?.language || "en");
-}
-
-// GitHub mark (inline SVG — lucide dropped third-party brand logos; use SVG, not emoji)
-function GithubIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 .5C5.37.5 0 5.78 0 12.29c0 5.21 3.44 9.63 8.21 11.19.6.11.82-.25.82-.56 0-.28-.01-1.02-.02-2-3.34.71-4.04-1.58-4.04-1.58-.55-1.37-1.33-1.74-1.33-1.74-1.09-.73.08-.72.08-.72 1.2.08 1.84 1.21 1.84 1.21 1.07 1.79 2.81 1.27 3.49.97.11-.76.42-1.27.76-1.56-2.67-.3-5.47-1.31-5.47-5.83 0-1.29.47-2.34 1.24-3.17-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.21.96-.26 1.98-.39 3-.4 1.02.01 2.04.14 3 .4 2.29-1.53 3.29-1.21 3.29-1.21.66 1.66.25 2.88.12 3.18.77.83 1.24 1.88 1.24 3.17 0 4.53-2.81 5.53-5.49 5.82.43.37.81 1.1.81 2.22 0 1.6-.01 2.9-.01 3.29 0 .31.21.68.83.56C20.56 21.91 24 17.49 24 12.29 24 5.78 18.63.5 12 .5z"/>
-    </svg>
-  );
 }
 
 const PILLAR_ICONS = [MessagesSquare, BrainCircuit, ShieldCheck];
@@ -308,9 +298,6 @@ export function Landing() {
     setLang(nextLang);
     try { localStorage.setItem("open-tag.lang", nextLang); } catch { /* ignore */ }
   };
-  const origin = typeof window !== "undefined" && window.location?.origin ? window.location.origin : undefined;
-  const docsHref = resolveDocsHref(origin);
-
   // Scroll reveal: add is-visible once a section enters the viewport (one-shot); reduced-motion falls back to visible via CSS.
   useEffect(() => {
     const els = document.querySelectorAll<HTMLElement>(".lp-root .lp-reveal");
@@ -326,6 +313,7 @@ export function Landing() {
     <main className="lp-root">
       <MarketingNav
         variant="landing"
+        showLinks={false}
         labels={{
           features: copy.nav.features,
           capabilities: copy.nav.capabilities,
@@ -352,13 +340,10 @@ export function Landing() {
           </div>
         <div className="lp-container">
           <div className="lp-hero__intro">
-            <span className="lp-eyebrow">{copy.hero.eyebrow}</span>
             <HeroTitle title={copy.hero.title} />
             <p className="lp-hero__sub">{copy.hero.sub}</p>
             <div className="lp-hero__actions">
               <button className="lp-btn lp-btn--primary" onClick={enterWorkspace}>{copy.nav.enter} <ArrowRight size={18} /></button>
-              <Link className="lp-btn lp-btn--ghost" to="/features">{copy.hero.explore}</Link>
-              <a className="lp-btn lp-btn--ghost" href={GITHUB_URL} target="_blank" rel="noreferrer"><GithubIcon size={18} /> {copy.hero.github}</a>
             </div>
             <p className="lp-hero__note">{copy.hero.note}</p>
           </div>
@@ -488,7 +473,6 @@ export function Landing() {
           <h2 className="lp-cta__title">{copy.cta.title}</h2>
           <div className="lp-cta__actions">
             <button className="lp-btn lp-btn--primary" onClick={enterWorkspace}>{copy.nav.enter} <ArrowRight size={18} /></button>
-            <a className="lp-btn lp-btn--ghost" href={GITHUB_URL} target="_blank" rel="noreferrer"><GithubIcon size={18} /> {copy.hero.github}</a>
           </div>
         </div>
       </section>
@@ -500,25 +484,6 @@ export function Landing() {
             <div className="lp-footer__brand">
               <PublicBrand />
               <p className="lp-footer__tagline">{copy.footer.tagline}</p>
-            </div>
-            <div className="lp-footer__col">
-              <h4>{copy.footer.product}</h4>
-              <Link to="/features">{copy.nav.features}</Link>
-              <a href="#capabilities">{copy.nav.capabilities}</a>
-              <a href="#engines">{copy.nav.engines}</a>
-              <a href="#self-hosted">{copy.nav.selfHosted}</a>
-            </div>
-            <div className="lp-footer__col">
-              <h4>{copy.footer.resources}</h4>
-              <a href={`${docsHref}#quickstart`}>{copy.footer.quickstart}</a>
-              <a href={`${docsHref}#source`}>{copy.footer.architecture}</a>
-              <a href={docsHref}>{copy.nav.docs}</a>
-            </div>
-            <div className="lp-footer__col">
-              <h4>{copy.footer.openSource}</h4>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">{copy.footer.license}</a>
-              <a href={GITHUB_URL} target="_blank" rel="noreferrer">{copy.footer.issues}</a>
             </div>
           </div>
           <div className="lp-footer__base">

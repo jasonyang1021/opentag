@@ -43,12 +43,16 @@ test("landing and features render the shared MarketingNav instead of hand-writte
   assert.match(marketingNav, /PUBLIC_NAV_LINKS/);
   assert.match(marketingNav, /PUBLIC_BRAND_MARK_SRC/);
   assert.match(marketingNav, /className="lp-brand-mark"/);
+  assert.match(marketingNav, /showLinks\s*=\s*true/);
   assert.match(marketingNav, /export function PublicBrand/);
 
   assert.match(landing, /<MarketingNav[\s\S]*variant="landing"/);
+  assert.match(landing, /showLinks=\{false\}/);
   assert.match(landing, /<PublicBrand/);
   assert.doesNotMatch(landing, /<header className="lp-nav">/);
   assert.doesNotMatch(landing, /open<b>-tag<\/b>/);
+  assert.doesNotMatch(landing, /copy\.hero\.eyebrow/);
+  assert.doesNotMatch(landing, /GITHUB_URL/);
 
   assert.match(features, /<MarketingNav[\s\S]*variant="features"/);
   assert.doesNotMatch(features, /<header className="lp-nav">/);

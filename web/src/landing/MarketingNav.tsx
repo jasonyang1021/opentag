@@ -8,6 +8,7 @@ import {
 
 type MarketingNavProps = {
   variant: "landing" | "features";
+  showLinks?: boolean;
   labels?: Partial<Record<PublicNavLinkKey, string>>;
   enterLabel: string;
   onEnterWorkspace: () => void;
@@ -39,6 +40,7 @@ export function PublicBrand({ href, className = "" }: PublicBrandProps) {
 // publicNav contract from Astro so top-level links and brand assets do not drift.
 export function MarketingNav({
   variant,
+  showLinks = true,
   labels = {},
   enterLabel,
   onEnterWorkspace,
@@ -56,13 +58,15 @@ export function MarketingNav({
             <PublicBrandContent />
           </Link>
         )}
-        <nav className="lp-nav__links" aria-label="Main navigation">
-          {PUBLIC_NAV_LINKS.map((link) => (
-            <a key={link.key} href={resolvePublicNavHref(link, origin, "marketing")}>
-              {labels[link.key] ?? link.label}
-            </a>
-          ))}
-        </nav>
+        {showLinks && (
+          <nav className="lp-nav__links" aria-label="Main navigation">
+            {PUBLIC_NAV_LINKS.map((link) => (
+              <a key={link.key} href={resolvePublicNavHref(link, origin, "marketing")}>
+                {labels[link.key] ?? link.label}
+              </a>
+            ))}
+          </nav>
+        )}
         <div className="lp-nav__cta">
           {languageToggle && (
             <button className="lp-btn lp-btn--ghost lp-btn--sm" type="button" onClick={languageToggle.onClick} aria-label={languageToggle.label}>
