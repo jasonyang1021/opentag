@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Tagora">
+  <circle cx="64" cy="64" r="17" fill="#202126"/>
+  <circle cx="27" cy="19" r="10" fill="#ff4b42"/>
+  <path d="M45 24a43 43 0 0 0-28 59c3 8 14 10 20 4 4-4 4-9 2-14a20 20 0 0 1 14-27c6-2 10-7 9-13-1-8-9-12-17-9Z" fill="#ff4b42"/>
+  <circle cx="101" cy="109" r="10" fill="#4338ff"/>
+  <path d="M83 104a43 43 0 0 0 28-59c-3-8-14-10-20-4-4 4-4 9-2 14a20 20 0 0 1-14 27c-6 2-10 7-9 13 1 8 9 12 17 9Z" fill="#4338ff"/>
+</svg>

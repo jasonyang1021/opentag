@@ -7,7 +7,7 @@ import type { TFunction } from "i18next";
 import { TOKEN_KEY } from "../routing.ts"; // single source for the session-token storage key (shared with store.tsx + the "/" guard)
 
 function AuthBrand() {
-  return <img className="auth-brand" src="/apri-logo.png" alt="APRI" width={190} height={63} />;
+  return <img className="auth-brand" src="/tagora-logo-v1.svg" alt="Tagora" width={190} height={70} />;
 }
 
 // On successful login/register: persist token, clear dev user, and redirect to target. The caller resolves the

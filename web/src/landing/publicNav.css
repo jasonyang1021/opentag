@@ -82,10 +82,17 @@
 }
 
 .lp-brand-mark {
-  width: 132px;
-  height: 44px;
+  width: 212px;
+  height: 62px;
   object-fit: contain;
   flex: 0 0 auto;
+}
+
+@media (max-width: 620px) {
+  .lp-brand-mark {
+    width: 156px;
+    height: 48px;
+  }
 }
 
 .lp-nav__links {

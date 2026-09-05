@@ -26,13 +26,13 @@ type PublicBrandProps = {
 
 function PublicBrandContent() {
   return (
-    <img className="lp-brand-mark" src={PUBLIC_BRAND_MARK_SRC} alt="APRI" width={132} height={44} />
+    <img className="lp-brand-mark" src={PUBLIC_BRAND_MARK_SRC} alt="Tagora" width={212} height={62} />
   );
 }
 
 export function PublicBrand({ href, className = "" }: PublicBrandProps) {
   const classes = ["lp-brand", className].filter(Boolean).join(" ");
-  if (href) return <a className={classes} href={href} aria-label="APRI home"><PublicBrandContent /></a>;
+  if (href) return <a className={classes} href={href} aria-label="Tagora home"><PublicBrandContent /></a>;
   return <div className={classes}><PublicBrandContent /></div>;
 }
 
@@ -54,7 +54,7 @@ export function MarketingNav({
         {variant === "landing" ? (
           <PublicBrand href="#top" />
         ) : (
-          <Link className="lp-brand" to="/" aria-label="APRI home">
+          <Link className="lp-brand" to="/" aria-label="Tagora home">
             <PublicBrandContent />
           </Link>
         )}

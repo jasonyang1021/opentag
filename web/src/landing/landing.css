@@ -6,8 +6,8 @@
  * Everything is scoped under `.lp-root` with `--lp-` prefixed variables, strictly isolated from the
  * app skin (styles.css) so the two never leak into each other.
  * Constraints (DESIGN.md): no saturated CTA color, no pure black/white; atmospheric orbs are the
- * only color moment and live in a background layer. Display = EB Garamond (already loaded in
- * index.html, shared with the app serif), body = Inter.
+ * only color moment and live in a background layer. Display and body both use Inter so the
+ * bilingual interface keeps a clean, contemporary rhythm.
  */
 
 .lp-root {
@@ -34,7 +34,7 @@
   --lp-trace-bg: #0c0a09; --lp-trace-fg: #e7e5e4; --lp-trace-accent: #f4c5a8; --lp-trace-comment: #777169; --lp-trace-val: #a8a29e;
 
   /* —— Type —— */
-  --lp-font-display: "EB Garamond", Georgia, "Times New Roman", serif;
+  --lp-font-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --lp-font-body: Inter, system-ui, -apple-system, sans-serif;
   --lp-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
 
@@ -49,7 +49,7 @@
   --lp-section-y: 112px;
   --lp-container-max: 1180px;
   --lp-gutter: 36px;
-  --lp-public-nav-height: 64px;
+  --lp-public-nav-height: 78px;
 
   /* —— Radius / elevation / motion —— */
   --lp-radius-xs: 6px; --lp-radius-sm: 10px; --lp-radius-md: 16px; --lp-radius-lg: 24px; --lp-radius-pill: 9999px;
@@ -96,10 +96,10 @@
 .lp-eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; opacity: 0.55; }
 
 .lp-display {
-  font-family: var(--lp-font-display); font-weight: 400;
+  font-family: var(--lp-font-display); font-weight: 600;
   line-height: var(--lp-leading-tight); letter-spacing: var(--lp-tracking-display);
 }
-.lp-section-title { font-family: var(--lp-font-display); font-weight: 400; font-size: var(--lp-text-3xl); line-height: 1.06; letter-spacing: var(--lp-tracking-display); max-width: 18ch; }
+.lp-section-title { font-family: var(--lp-font-display); font-weight: 600; font-size: var(--lp-text-3xl); line-height: 1.06; letter-spacing: var(--lp-tracking-display); max-width: 18ch; }
 .lp-section-lead { margin-top: var(--lp-space-5); font-size: var(--lp-text-lg); color: var(--lp-fg-2); max-width: 56ch; }
 
 /* —— Atmospheric gradient orbs (background glow layer, shared with the app DESIGN.md; pure CSS) —— */
@@ -147,13 +147,13 @@
 .lp-features .lp-nav { position: relative; }
 
 /* —— Hero —— */
-.lp-hero { position: relative; z-index: 1; padding-top: 96px; padding-bottom: var(--lp-section-y); }
-.lp-hero__intro { max-width: 920px; margin: 0 auto; text-align: center; }
+.lp-hero { position: relative; z-index: 1; padding-top: 68px; padding-bottom: 96px; }
+.lp-hero__intro { max-width: 840px; margin: 0 auto; text-align: center; }
 .lp-hero__intro .lp-eyebrow { justify-content: center; }
 /* Selectors are scoped under .lp-hero__intro (specificity 0,2,0) so the per-element margin-top
    survives the `.lp-root h1,h2,h3,p { margin: 0 }` reset (0,1,1) — without the prefix that reset
    wins and the title↔subtitle gap collapses (the subtitle <p> overlaps the <h1>). */
-.lp-hero__intro .lp-hero__title { margin-top: var(--lp-space-6); font-family: var(--lp-font-display); font-weight: 400; font-size: 78px; line-height: 1.15; letter-spacing: var(--lp-tracking-display); }
+.lp-hero__intro .lp-hero__title { margin-top: var(--lp-space-5); font-family: var(--lp-font-display); font-weight: 650; font-size: 60px; line-height: 1.08; letter-spacing: -0.04em; }
 .lp-hero__title em { font-style: italic; color: var(--lp-accent); }
 /* Hero typewriter visuals. The JS types char-by-char (HeroTitle in Landing.tsx); these rules are
    what make it *read* as typing. .lp-type__rest holds the not-yet-typed text invisibly so the box
@@ -168,13 +168,13 @@
 }
 .lp-caret.is-done { animation: none; opacity: 0; }
 @keyframes lp-caret-blink { 0%, 50% { opacity: 1; } 50.001%, 100% { opacity: 0; } }
-.lp-hero__intro .lp-hero__sub { margin-top: var(--lp-space-8); margin-inline: auto; font-size: var(--lp-text-lg); color: var(--lp-fg-2); max-width: 48ch; }
-.lp-hero__actions { margin-top: var(--lp-space-12); display: flex; gap: var(--lp-space-4); justify-content: center; flex-wrap: wrap; }
-.lp-hero__intro .lp-hero__note { margin-top: var(--lp-space-5); text-align: center; font-size: var(--lp-text-sm); color: var(--lp-muted); }
+.lp-hero__intro .lp-hero__sub { margin-top: var(--lp-space-6); margin-inline: auto; font-size: 18px; line-height: 1.65; color: var(--lp-fg-2); max-width: 52ch; }
+.lp-hero__actions { margin-top: var(--lp-space-8); display: flex; gap: var(--lp-space-4); justify-content: center; flex-wrap: wrap; }
+.lp-hero__intro .lp-hero__note { margin-top: var(--lp-space-4); text-align: center; font-size: var(--lp-text-sm); color: var(--lp-muted); }
 .lp-hero__note code { font-family: var(--lp-font-mono); font-size: 13px; color: var(--lp-fg-2); background: var(--lp-surface-warm); padding: 2px 7px; border-radius: var(--lp-radius-xs); }
 
 /* —— Hero product showcase: macOS browser shell + recreated channel page (chat view) —— */
-.lp-browser { width: calc(100% - 40px); max-width: 1200px; margin: 64px auto 0; background: var(--lp-surface); border: 1px solid var(--lp-border); border-radius: var(--lp-radius-lg); box-shadow: var(--lp-elev-raised); overflow: hidden; }
+.lp-browser { width: calc(100% - 40px); max-width: 1200px; margin: 48px auto 0; background: var(--lp-surface); border: 1px solid var(--lp-border); border-radius: var(--lp-radius-lg); box-shadow: var(--lp-elev-raised); overflow: hidden; }
 .lp-browser--static { pointer-events: none; }
 .lp-browser__bar { display: flex; align-items: center; gap: var(--lp-space-3); height: 42px; padding-inline: var(--lp-space-4); border-bottom: 1px solid var(--lp-border-soft); background: var(--lp-bg-2); }
 .lp-browser__dots { display: flex; gap: 7px; }
@@ -532,7 +532,7 @@
 /* —— Responsive —— */
 @media (max-width: 980px) {
   .lp-root { --lp-section-y: 80px; --lp-text-3xl: 48px; --lp-gutter: 24px; }
-  .lp-hero__title { font-size: 56px; }
+  .lp-hero__intro .lp-hero__title { font-size: 50px; }
   .lp-glass__grid { grid-template-columns: 1fr; gap: var(--lp-space-12); }
   .lp-pillars, .lp-caps, .lp-engines, .lp-arch { grid-template-columns: 1fr 1fr; }
   .lp-feature-hero__grid, .lp-feature-case-head, .lp-feature-case { grid-template-columns: 1fr; }
@@ -547,8 +547,10 @@
   .lp-footer__grid { grid-template-columns: 1fr 1fr; gap: var(--lp-space-8); }
 }
 @media (max-width: 620px) {
-  .lp-root { --lp-section-y: 56px; --lp-text-3xl: 38px; }
-  .lp-hero__title { font-size: 42px; }
+  .lp-root { --lp-section-y: 56px; --lp-text-3xl: 38px; --lp-public-nav-height: 64px; --lp-gutter: 18px; }
+  .lp-hero { padding-top: 48px; padding-bottom: 64px; }
+  .lp-hero__intro .lp-hero__title { font-size: 39px; line-height: 1.12; letter-spacing: -0.035em; }
+  .lp-hero__intro .lp-hero__sub { margin-top: var(--lp-space-5); font-size: 16px; }
   .lp-feature-hero { padding-block: 56px; }
   .lp-feature-hero__title { font-size: 42px; }
   .lp-feature-case__copy h3 { font-size: 34px; }
