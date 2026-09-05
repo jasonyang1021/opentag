@@ -486,10 +486,6 @@ export function Landing() {
               <p className="lp-footer__tagline">{copy.footer.tagline}</p>
             </div>
           </div>
-          <div className="lp-footer__base">
-            <span>{copy.footer.copyright}</span>
-            <span>{copy.footer.built}</span>
-          </div>
         </div>
       </footer>
     </main>
