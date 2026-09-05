@@ -4,7 +4,10 @@ import {
   buildMemberGraph,
   connectedMemberKeys,
   layoutMemberGraph,
+  MAX_VISIBLE_EDGE_STRANDS,
   summarizeChannels,
+  totalInteractionCount,
+  visibleEdgeStrandCount,
   type CollaborationGraphData,
 } from "../web/src/lib/collaborationGraph.ts";
 
@@ -31,7 +34,15 @@ test("member graph projects interaction evidence into weighted member links", ()
   assert.equal(graph.edges.length, 2);
   const shared = graph.edges.find((edge) => edge.sourceKey === "agent:a1" && edge.targetKey === "human:u1");
   assert.equal(shared?.weight, 5);
-  assert.equal(graph.nodes.find((node) => node.id === "u1")?.connections, 1);
+  assert.equal(graph.nodes.find((node) => node.id === "u1")?.connections, 5);
+  assert.equal(graph.nodes.find((node) => node.id === "a1")?.connections, 7);
+  assert.equal(totalInteractionCount(graph.edges), 7);
+});
+
+test("curve bundles show exact normal counts and cap pathological histories", () => {
+  assert.equal(visibleEdgeStrandCount(7), 7);
+  assert.equal(visibleEdgeStrandCount(1), 1);
+  assert.equal(visibleEdgeStrandCount(10_000), MAX_VISIBLE_EDGE_STRANDS);
 });
 
 test("member focus includes direct collaborators and deterministic layout stays in bounds", () => {

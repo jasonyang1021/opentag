@@ -8,8 +8,11 @@ import {
   buildMemberGraph,
   connectedMemberKeys,
   layoutMemberGraph,
+  MAX_VISIBLE_EDGE_STRANDS,
   memberNodeKey,
   summarizeChannels,
+  totalInteractionCount,
+  visibleEdgeStrandCount,
   type CollaborationGraphData,
   type MemberGraphNode,
 } from "../lib/collaborationGraph.ts";
@@ -17,6 +20,7 @@ import {
 const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [], interactions: [] };
 const GRAPH_WIDTH = 1040;
 const GRAPH_HEIGHT = 640;
+const curveSign = (value: string) => [...value].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 ? 1 : -1;
 
 export function CollaborationGraph() {
   const { t } = useTranslation();
@@ -45,6 +49,7 @@ export function CollaborationGraph() {
   const positioned = useMemo(() => layoutMemberGraph(graph.nodes, graph.edges, GRAPH_WIDTH, GRAPH_HEIGHT), [graph]);
   const positions = useMemo(() => new Map(positioned.map((node) => [memberNodeKey(node), node])), [positioned]);
   const connected = useMemo(() => focused ? connectedMemberKeys(focused, graph.edges) : null, [focused, graph.edges]);
+  const linkCount = useMemo(() => totalInteractionCount(graph.edges), [graph.edges]);
   const mostConnected = useMemo(() => [...graph.nodes].sort((a, b) => b.connections - a.connections || (a.displayName || a.name).localeCompare(b.displayName || b.name)).slice(0, 6), [graph.nodes]);
   const largestChannels = useMemo(() => summarizeChannels(data ?? EMPTY), [data]);
 
@@ -55,7 +60,7 @@ export function CollaborationGraph() {
   return (
     <div className="collab-wrap">
       <div className="collab-toolbar">
-        <div className="collab-connection-total"><span />{t("members.graphConnections")} <b>{graph.nodes.length}</b></div>
+        <div className="collab-connection-total"><div><span />{t("members.graphConnections")} <b>{graph.nodes.length}</b></div><small>{t("members.graphLineLegend", { limit: MAX_VISIBLE_EDGE_STRANDS })}</small></div>
         <div className="collab-toolbar-actions">
           <button title={t("members.graphZoomOut")} aria-label={t("members.graphZoomOut")} onClick={() => setScale(viewport.scale - 0.15)}><ZoomOut size={15} /></button>
           <button title={t("members.graphResetView")} aria-label={t("members.graphResetView")} onClick={resetViewport}><Maximize2 size={14} /></button>
@@ -82,12 +87,25 @@ export function CollaborationGraph() {
           >
             <div className="collab-stage" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})` }}>
               <svg viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`} preserveAspectRatio="none" aria-label={t("members.graphAriaLabel")}>
-                {graph.edges.map((edge) => {
+                {graph.edges.flatMap((edge) => {
                   const source = positions.get(edge.sourceKey);
                   const target = positions.get(edge.targetKey);
-                  if (!source || !target) return null;
+                  if (!source || !target) return [];
                   const active = !focused || edge.sourceKey === memberNodeKey(focused) || edge.targetKey === memberNodeKey(focused);
-                  return <line key={`${edge.sourceKey}:${edge.targetKey}`} className={active ? "active" : "dim"} x1={source.x} y1={source.y} x2={target.x} y2={target.y} style={{ strokeWidth: Math.min(2.2, 0.65 + Math.log2(edge.weight + 1) * 0.32) }}><title>{t("members.graphInteractionCount", { count: edge.weight })}</title></line>;
+                  const strandCount = visibleEdgeStrandCount(edge.weight);
+                  const dx = target.x - source.x;
+                  const dy = target.y - source.y;
+                  const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+                  const normalX = -dy / distance;
+                  const normalY = dx / distance;
+                  const spacing = strandCount > 12 ? 2.7 : 4;
+                  const baseCurve = curveSign(`${edge.sourceKey}|${edge.targetKey}`) * 12;
+                  return Array.from({ length: strandCount }, (_, index) => {
+                    const offset = baseCurve + (index - (strandCount - 1) / 2) * spacing;
+                    const controlX = (source.x + target.x) / 2 + normalX * offset;
+                    const controlY = (source.y + target.y) / 2 + normalY * offset;
+                    return <path key={`${edge.sourceKey}:${edge.targetKey}:${index}`} className={active ? "active" : "dim"} d={`M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`}><title>{t("members.graphInteractionCount", { count: edge.weight })}</title></path>;
+                  });
                 })}
               </svg>
               {positioned.map((node) => {
@@ -112,7 +130,7 @@ export function CollaborationGraph() {
             <div className="collab-stats">
               <span><b>{data.humans.length}</b><small>{t("common.humans")}</small></span>
               <span><b>{data.agents.length}</b><small>{t("common.agents")}</small></span>
-              <span><b>{graph.edges.length}</b><small>{t("members.graphLinks")}</small></span>
+              <span><b>{linkCount}</b><small>{t("members.graphLinks")}</small></span>
             </div>
             <section className="collab-ranking">
               <h3>{t("members.graphMostConnected")}</h3>

@@ -71,11 +71,22 @@ export function buildMemberGraph(data: CollaborationGraphData) {
   });
   const degree = new Map<string, number>();
   for (const edge of edges) {
-    degree.set(edge.sourceKey, (degree.get(edge.sourceKey) ?? 0) + 1);
-    degree.set(edge.targetKey, (degree.get(edge.targetKey) ?? 0) + 1);
+    degree.set(edge.sourceKey, (degree.get(edge.sourceKey) ?? 0) + edge.weight);
+    degree.set(edge.targetKey, (degree.get(edge.targetKey) ?? 0) + edge.weight);
   }
   const nodes: MemberGraphNode[] = sourceNodes.map((node) => ({ ...node, connections: degree.get(memberNodeKey(node)) ?? 0 }));
   return { nodes, edges };
+}
+
+export const MAX_VISIBLE_EDGE_STRANDS = 24;
+
+/** Exact for normal relationships; bounded for pathological histories to keep SVG responsive. */
+export function visibleEdgeStrandCount(weight: number) {
+  return Math.min(MAX_VISIBLE_EDGE_STRANDS, Math.max(1, Math.round(weight)));
+}
+
+export function totalInteractionCount(edges: MemberConnection[]) {
+  return edges.reduce((total, edge) => total + edge.weight, 0);
 }
 
 export function summarizeChannels(data: CollaborationGraphData, limit = 6): ChannelSummary[] {

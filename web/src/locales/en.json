@@ -87,6 +87,7 @@
     "graphMostConnected": "Most connected",
     "graphLargestChannels": "Largest channels",
     "graphInteractionCount": "{{count}} collaboration interactions",
+    "graphLineLegend": "Each curve is one interaction · bundles cap at {{limit}}",
     "graphAriaLabel": "Workspace member connection graph",
     "graphZoomIn": "Zoom in",
     "graphZoomOut": "Zoom out",

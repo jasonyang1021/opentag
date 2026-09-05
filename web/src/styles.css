@@ -453,8 +453,9 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 .graph-head>span{padding:3px 7px;border:1px solid var(--hair-strong);border-radius:4px;background:var(--g-lime);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink)}
 .collab-wrap{flex:1;min-height:0;overflow:auto;padding:16px 22px 28px;background:var(--surface)}
 .collab-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-.collab-connection-total{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-.collab-connection-total>span{width:7px;height:7px;border:1px solid var(--muted);border-radius:50%}
+.collab-connection-total{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.collab-connection-total>div{display:flex;align-items:center;gap:7px}.collab-connection-total>div>span{width:7px;height:7px;border:1px solid var(--muted);border-radius:50%}
+.collab-connection-total>small{font-size:9px;font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--muted-soft)}
 .collab-connection-total b{font-weight:600;color:var(--muted-soft)}
 .collab-toolbar-actions{display:flex;align-items:center;gap:5px}
 .collab-toolbar-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:31px;min-width:31px;padding:0 8px;border:1px solid var(--hair-strong);border-radius:5px;background:var(--surface);color:var(--body);cursor:pointer}
@@ -466,9 +467,9 @@ main.content-col > .composer{position:absolute;left:0;right:var(--scrollbar-gutt
 .collab-stage{position:absolute;inset:0;transform-origin:0 0;transition:transform .12s ease-out}
 .collab-canvas.dragging .collab-stage{transition:none}
 .collab-stage svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.collab-stage line{stroke:var(--hair-strong);vector-effect:non-scaling-stroke;opacity:.48;transition:opacity var(--dur-fast),stroke var(--dur-fast)}
-.collab-stage line.active{stroke:var(--muted);opacity:.55}
-.collab-stage line.dim{opacity:.025}
+.collab-stage path{fill:none;stroke:var(--hair-strong);stroke-width:.72;stroke-linecap:round;vector-effect:non-scaling-stroke;opacity:.34;transition:opacity var(--dur-fast),stroke var(--dur-fast)}
+.collab-stage path.active{stroke:var(--muted);opacity:.4}
+.collab-stage path.dim{opacity:.018}
 .collab-node{position:absolute;transform:translate(-19px,-19px);display:block;width:38px;height:38px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--ink);cursor:pointer;z-index:2;transition:opacity var(--dur-fast),filter var(--dur-fast)}
 .collab-node-avatar{display:block;width:38px;height:38px;border:2px solid var(--ink);border-radius:50%;background:var(--surface);box-shadow:0 1px 0 var(--hair);overflow:hidden}
 .collab-node-avatar .av-img{width:100%!important;height:100%!important}

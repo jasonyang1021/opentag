@@ -87,6 +87,7 @@
     "graphMostConnected": "连接最多",
     "graphLargestChannels": "最大频道",
     "graphInteractionCount": "{{count}} 次协作互动",
+    "graphLineLegend": "每条曲线代表 1 次互动 · 超过 {{limit}} 次合并显示",
     "graphAriaLabel": "工作区成员关系图",
     "graphZoomIn": "放大",
     "graphZoomOut": "缩小",
