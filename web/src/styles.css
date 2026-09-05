@@ -204,7 +204,7 @@ mark{background:var(--g-peach);color:var(--ink);padding:0 2px;border-radius:4px}
 .inv-acts{display:flex;gap:6px;flex:0 0 auto}
 .auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--canvas-soft);padding:20px}
 .auth-card{width:100%;max-width:380px;background:var(--canvas);border:1px solid var(--hair-strong);border-radius:8px;padding:28px 26px;box-shadow:0 8px 28px var(--shadow-3)}
-.auth-brand{font-family:var(--serif);font-size:22px;color:var(--ink);margin-bottom:6px}
+.auth-brand{display:block;width:190px;height:auto;object-fit:contain;margin:0 0 10px}
 .auth-card h1{font-size:20px;margin:0 0 16px;color:var(--ink)}
 .auth-field{display:block;margin-bottom:10px}
 .auth-field span{display:block;font-size:13px;font-weight:500;color:var(--body);margin:0 0 5px}

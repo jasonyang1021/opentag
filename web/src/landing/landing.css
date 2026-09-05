@@ -290,7 +290,7 @@
 .lp-product-rail { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 14px 0; background: var(--lp-bg-2); border-right: 1px solid var(--lp-border-soft); color: var(--lp-muted); }
 .lp-product-rail svg { flex: none; }
 .lp-product-rail svg.is-active { width: 40px; height: 40px; padding: 10px; border-radius: 12px; background: var(--lp-surface); color: var(--lp-fg); box-shadow: 0 1px 5px rgba(0,0,0,.08); }
-.lp-product-brand { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 9px; background: var(--lp-fg); color: var(--lp-accent-on); font-family: var(--lp-font-display); font-size: 20px; position: relative; }
+.lp-product-brand { width: 36px; height: 36px; display: block; object-fit: contain; position: relative; }
 .lp-product-brand::after { content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--lp-orb--peach, #f4c5a8); border: 1px solid var(--lp-bg); }
 .lp-product-spacer { flex: 1; }
 .lp-product-sidebar { min-width: 0; display: flex; flex-direction: column; padding: 18px 14px 12px; background: var(--lp-surface); border-right: 1px solid var(--lp-border); }

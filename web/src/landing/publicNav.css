@@ -82,20 +82,10 @@
 }
 
 .lp-brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  object-fit: cover;
+  width: 132px;
+  height: 44px;
+  object-fit: contain;
   flex: 0 0 auto;
-}
-
-.lp-brand-word {
-  display: inline-block;
-  transform: translateY(-1px);
-}
-
-.lp-brand b {
-  font-weight: 500;
 }
 
 .lp-nav__links {

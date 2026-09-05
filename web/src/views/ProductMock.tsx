@@ -224,7 +224,7 @@ export function ProductMock({ item, threadOpen = true, onToggleThread, compact =
       </div>
       <div className="lp-product-app">
         <aside className="lp-product-rail" aria-hidden="true">
-          <span className="lp-product-brand">F</span>
+          <img className="lp-product-brand" src="/apri-mark.png" alt="" />
           <Search size={18} />
           <Inbox size={18} />
           <MessageSquare className="is-active" size={18} />

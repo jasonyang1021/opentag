@@ -24,7 +24,7 @@ const landingCss = fs.readFileSync(new URL("../web/src/landing/landing.css", imp
 const docsCss = fs.readFileSync(new URL("../docs-site/src/styles/docs.css", import.meta.url), "utf8");
 
 test("public nav source of truth exports the shared brand asset and top-level links", () => {
-  assert.match(navContract, /PUBLIC_BRAND_MARK_SRC\s*=\s*"\/favicon\.svg"/);
+  assert.match(navContract, /PUBLIC_BRAND_MARK_SRC\s*=\s*"\/apri-logo\.png"/);
   assert.match(navContract, /DOCS_SITE_URL\s*=\s*"https:\/\/docs\.getopentag\.com\/"/);
   assert.match(navContract, /GITHUB_URL\s*=\s*"https:\/\/github\.com\/fancyboi999\/open-tag"/);
   for (const key of ["features", "capabilities", "engines", "selfHosted", "docs"]) {
@@ -65,7 +65,7 @@ test("docs imports the shared public nav contract and renders the shared public-
   assert.match(docs, /<div class="lp-container lp-nav__inner">/);
   assert.match(docs, /class="lp-brand"/);
   assert.match(docs, /class="lp-brand-mark"/);
-  assert.match(docs, /class="lp-brand-word">open<b>-tag<\/b><\/span>/);
+  assert.match(docs, /alt="APRI"/);
   assert.match(docs, /class="lp-nav__links"/);
   assert.match(docs, /class="lp-nav__cta"/);
   assert.match(docs, /class="lp-btn lp-btn--ghost lp-btn--sm"/);
@@ -82,10 +82,8 @@ test("marketing and docs headers use the same visual contract", () => {
   assert.match(docsCss, /@import "..\/..\/..\/web\/src\/landing\/publicNav\.css"/);
 
   assert.match(publicNavCss, /\.lp-nav__inner\s*\{[^}]*height:\s*var\(--lp-public-nav-height\)/s);
-  assert.match(publicNavCss, /\.lp-brand-mark\s*\{[^}]*width:\s*34px;[^}]*height:\s*34px/s);
+  assert.match(publicNavCss, /\.lp-brand-mark\s*\{[^}]*width:\s*132px;[^}]*height:\s*44px/s);
   assert.match(publicNavCss, /\.lp-brand\s*\{[^}]*font-family:\s*var\(--lp-font-display\);[^}]*font-size:\s*24px;[^}]*letter-spacing:\s*-0\.01em/s);
-  assert.match(publicNavCss, /\.lp-brand-word\s*\{[^}]*transform:\s*translateY\(-1px\)/s);
-  assert.match(publicNavCss, /\.lp-brand b\s*\{[^}]*font-weight:\s*500/s);
   assert.match(publicNavCss, /\.lp-nav__links\s*\{[^}]*gap:\s*var\(--lp-space-8\)/s);
   assert.match(publicNavCss, /\.lp-btn--sm\s*\{[^}]*padding:\s*9px 18px;[^}]*font-size:\s*var\(--lp-text-sm\)/s);
 
