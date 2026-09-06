@@ -732,35 +732,43 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
   const [runtime, setRuntime] = useState("claude"); const [model, setModel] = useState("");
   const [models, setModels] = useState<{ id: string; label?: string; thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string } }[]>([]);   const [fast, setFast] = useState(false);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelSource, setModelSource] = useState("");
+  const [probeAttempt, setProbeAttempt] = useState(0);
+  const selectedMachine = machines.find((m) => m.id === machineId);
+  const runtimeAvailable = selectedMachine?.status === "online" && selectedMachine.runtimes?.includes(runtime);
+  const selectionKey = `${serverId}:${machineId}:${runtime}`;
+  const [loadedKey, setLoadedKey] = useState("");
   const [reasoning, setReasoning] = useState(""); // reasoning effort (""=Default/no override); shown when selected model has thinking levels
   const [busy, setBusy] = useState(false); const [err, setErr] = useState("");
   useEscClose(() => { if (projectPickerOpen) setProjectPickerOpen(false); else onClose(); });
-  // Sentinel + per-runtime capability: claude/codex offer "use local default" (don't pass --model/--effort;
-  // the CLI uses ~/.claude / ~/.codex config). Other runtimes keep their original picker behavior.
+  // Local default omits a model override; it is not a claim of verified account access.
   const LOCAL_DEFAULT = "__default__";
-  const supportsLocalDefault = runtime === "claude" || runtime === "codex";
+  const supportsLocalDefault = !!runtime;
+  useEffect(() => {
+    if (!selectedMachine?.runtimes?.includes(runtime)) setRuntime(selectedMachine?.runtimes?.[0] || "");
+  }, [machineId, selectedMachine?.runtimes?.join(",")]);
   useEffect(() => {
     let cancelled = false;
     setModelsLoading(true);
+    setModels([]); setModel(""); setReasoning(""); setModelSource(""); setLoadedKey("");
+    if (!runtimeAvailable) { setModelsLoading(false); return; }
     (async () => {
       try {
-        const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}`);
+        const d = await api("GET", `/api/servers/${serverId}/machines/${machineId || "none"}/runtime-models/${runtime}${probeAttempt ? "?refresh=1" : ""}`);
         if (cancelled) return;
-        const ms: typeof models = d.models || [];
+        const ms: typeof models = d.source === "cli" && Array.isArray(d.models) ? d.models : [];
+        setModelSource(d.source === "cli" ? "cli" : (d.reason || "probe_failed"));
+        setLoadedKey(selectionKey);
         setModels(ms);
-        // Preserve the current selection if it still exists in the new list; otherwise fall back to the first option.
-        setModel((prev) => {
-          if (supportsLocalDefault && prev === LOCAL_DEFAULT) return prev;
-          const kept = ms.find((m) => m.id === prev);
-          return kept ? prev : (supportsLocalDefault ? LOCAL_DEFAULT : (ms[0]?.id || ""));
-        });
-        setReasoning((prev) => { const kept = ms.find((m) => m.id === model); return kept ? prev : (ms[0]?.thinking?.default ?? ""); });
-      } catch { if (!cancelled) setModels([]); }
+        setModel(ms.length ? LOCAL_DEFAULT : "");
+        setReasoning("");
+      } catch { if (!cancelled) { setModels([]); setModelSource("probe_failed"); setLoadedKey(selectionKey); setModel(""); } }
       finally { if (!cancelled) setModelsLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [runtime, machineId]);
+  }, [runtime, machineId, serverId, runtimeAvailable, probeAttempt]);
   const create = async () => {
+    if (!runtimeAvailable || modelsLoading || loadedKey !== selectionKey || !model || (model !== LOCAL_DEFAULT && !models.some((m) => m.id === model))) return;
     if (!machineId) { setErr(t("members.machineRequired")); return; } // Computer is required: an unbound agent only runs via the legacy broadcast-to-all-daemons fallback (tech-debt I77) — force an explicit pick.
     const nm = name.trim().normalize("NFC");
     if (!nm) { setErr(t("members.nameRequired")); return; }
@@ -799,13 +807,18 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         <label>{t("members.projectDirectoryLabel")}</label><ProjectDirectoryField value={projectPath} onChange={setProjectPath} machine={machines.find((machine) => machine.id === machineId)} pickerOpen={projectPickerOpen} onPickerOpenChange={setProjectPickerOpen} parentHandlesEscape />
         <div className="hint">{t("members.projectDirectoryHint")}</div>
         <label>{t("common.runtime")}</label>
-        <Select ariaLabel={t("common.runtime")} value={runtime} options={RUNTIMES} onChange={setRuntime} />
+        <Select ariaLabel={t("common.runtime")} value={runtime} options={RUNTIMES.filter((r) => selectedMachine?.runtimes?.includes(r.value))} onChange={setRuntime} />
+        {!runtimeAvailable && <div className="form-err">{t("members.runtimeUnavailable")}</div>}
         <label>{t("common.model")}</label>
         {/* During probe flight: disable interaction + show "Detecting models…" placeholder.
             fieldset[disabled] disables all descendant buttons without modifying Select.tsx. */}
-        <fieldset disabled={modelsLoading} style={{ border: 0, padding: 0, margin: 0, opacity: modelsLoading ? 0.6 : 1 }}>
+        <fieldset disabled={modelsLoading || !runtimeAvailable || loadedKey !== selectionKey} style={{ border: 0, padding: 0, margin: 0, opacity: modelsLoading ? 0.6 : 1 }}>
           <Select ariaLabel={t("common.model")} value={modelsLoading ? "" : model} options={modelsLoading ? modelLoadingOpts : modelOpts} onChange={(v) => { setModel(v); const m = models.find((m) => m.id === v); setReasoning(m?.thinking?.default ?? ""); }} />
         </fieldset>
+        {runtimeAvailable && !modelsLoading && <div className="hint">
+          {t(modelSource === "cli" ? "members.modelsFromCli" : "members.modelsProbeFailed")}
+          <button type="button" className="joinbtn" onClick={() => setProbeAttempt((n) => n + 1)}>{t("members.modelsRetry")}</button>
+        </div>}
         {thinkingLevels.length > 0 && <>
           <label>{t("members.reasoningLabel")}</label>
           <Select ariaLabel={t("common.reasoning")} value={reasoning} onChange={setReasoning}
@@ -813,7 +826,7 @@ export function CreateAgentModal({ onClose, prefill, onCreated }: { onClose: () 
         </>}
         <label className="ck-row"><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /><span>{t("members.fastMode")}</span></label>
         {err && <div className="form-err">{err}</div>}
-        <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy || !machineId} title={!machineId ? t("members.machineRequired") : undefined}>{busy ? t("members.creating") : t("members.create")}</button></div>
+        <div className="acts"><button className="cancel" onClick={onClose}>{t("members.cancel")}</button><button className="ok" onClick={create} disabled={busy || !runtimeAvailable || modelsLoading || loadedKey !== selectionKey || !model} title={!machineId ? t("members.machineRequired") : undefined}>{busy ? t("members.creating") : t("members.create")}</button></div>
       </div>
     </div>
     , document.body,

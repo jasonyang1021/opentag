@@ -4,14 +4,14 @@
 //
 // Scope: opencode / cursor / pi enumerate models; Hermes enumerates local profiles; reasonix
 // enumerates the providers/models of its resolved config via `reasonix doctor --json`.
-//  - claude / codex have no "list models" command — their catalogs stay static, server-side, but
-//    supported thinking/reasoning controls are probed dynamically.
+//  - Codex uses app-server model/list; Claude help describes effort aliases, not account access.
 //  - copilot / kimi would need an ACP (JSON-RPC over stdio) handshake — not done yet.
 //  Both gaps are tracked in docs/tech-debt-tracker.md.
 //
 // The parse functions are pure (unit-tested against fixtures captured from multica's discovery
 // research) and mirror multica's server/pkg/agent/models.go field-for-field.
 import { spawn, type ChildProcess } from "node:child_process";
+import { discoverCodexModels } from "./codexModels.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -298,9 +298,8 @@ function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_M
   });
 }
 
-// Probe the live model list for a runtime on this machine. Returns null for runtimes we can't probe
-// (claude/codex/copilot/kimi) or when the probe yields nothing — the caller falls back to a static
-// list. Never throws; a missing CLI surfaces as the spawn "error" event → empty output → null.
+// Probe choices on this machine. Missing/unsupported CLI or failed discovery returns null;
+// the picker exposes an unavailable state rather than substituting a static catalog.
 export async function listModels(runtime: string): Promise<DiscoveredModel[] | null> {
   switch (runtime) {
     case "opencode": {
@@ -332,9 +331,7 @@ export async function listModels(runtime: string): Promise<DiscoveredModel[] | n
       });
     }
     case "codex": {
-      const r = await runList("codex", ["debug", "models"]);
-      const models = parseCodexModels(r.stdout);
-      return models.length ? models : null;
+      return discoverCodexModels();
     }
     case "reasonix": {
       const r = await runList("reasonix", ["doctor", "--json"]);

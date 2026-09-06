@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { selectPosition } from "./selectPosition";
 
 export interface Opt { value: string; label: string; hint?: string }
 
@@ -15,12 +16,15 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0); // keyboard-highlighted option index
-  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [pos, setPos] = useState<React.CSSProperties | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const cur = options.find((o) => o.value === value);
 
-  const place = () => { const r = btnRef.current?.getBoundingClientRect(); if (r) setPos({ left: r.left, top: r.bottom + 6, width: r.width }); };
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect(); if (!r) return;
+    setPos({ ...selectPosition(r, window.innerWidth, window.innerHeight), boxSizing: "border-box", overscrollBehavior: "contain" });
+  };
   useLayoutEffect(() => { if (open) place(); }, [open]);
   useEffect(() => {
     if (!open) return;
@@ -37,6 +41,14 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
     window.addEventListener("scroll", onScroll, true);
     return () => { document.removeEventListener("mousedown", onDown); window.removeEventListener("resize", close); window.removeEventListener("scroll", onScroll, true); };
   }, [open, options, value]);
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current, item = menu?.children[hi] as HTMLElement | undefined;
+    if (!menu || !item) return;
+    if (item.offsetTop < menu.scrollTop) menu.scrollTop = item.offsetTop;
+    else if (item.offsetTop + item.offsetHeight > menu.scrollTop + menu.clientHeight)
+      menu.scrollTop = item.offsetTop + item.offsetHeight - menu.clientHeight;
+  }, [open, hi]);
 
   const pick = (v: string) => { onChange(v); setOpen(false); btnRef.current?.focus(); };
   const onKey = (e: React.KeyboardEvent) => {
@@ -44,6 +56,8 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
     if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
     else if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(options.length - 1, h + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
+    else if (e.key === "Home") { e.preventDefault(); setHi(0); }
+    else if (e.key === "End") { e.preventDefault(); setHi(Math.max(0, options.length - 1)); }
     else if (e.key === "Enter") { e.preventDefault(); options[hi] && pick(options[hi]!.value); }
   };
 
@@ -55,7 +69,7 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
         <svg className="sel-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && pos && createPortal(
-        <div ref={menuRef} className="sel-menu" role="listbox" style={{ left: pos.left, top: pos.top, minWidth: pos.width }} onKeyDown={onKey} tabIndex={-1}>
+        <div ref={menuRef} className="sel-menu" role="listbox" style={pos} onKeyDown={onKey} tabIndex={-1}>
           {options.length === 0 ? <div className="sel-empty">{t("select.empty")}</div> : options.map((o, i) => (
             <button key={o.value} type="button" role="option" aria-selected={o.value === value}
               className={"sel-opt" + (o.value === value ? " on" : "") + (i === hi ? " hi" : "")}

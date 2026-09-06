@@ -9,6 +9,13 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.15.3] — 2026-09-06
+
+### Fixed
+
+- Codex model discovery uses paginated app-server `model/list` instead of the unsupported debug command; no hard-coded model names are required.
+- Creation binds CLI/model choices to the selected online machine, exposes probe failures instead of preset catalogs, and keeps dropdowns inside the viewport.
+
 ## [0.15.2] — 2026-09-06
 
 ### Fixed

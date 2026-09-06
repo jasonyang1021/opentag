@@ -6,7 +6,7 @@ import { hashToken, newKey } from "../auth.js";
 import { can, capabilitiesFor, requireCap } from "../capabilities.js";
 import { createServer } from "../core.js";
 import { publish } from "../realtime.js";
-import { CODEX_FALLBACK_MODELS, DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
+import { DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
 import { PROJECT_BROWSER_CAPABILITY, requestDaemonByMachine } from "../daemonHub.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { createRequire } from "node:module";
@@ -125,35 +125,19 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
   const rm = /^\/api\/servers\/[^/]+\/machines\/([^/]+)\/runtime-models\/([^/]+)$/.exec(p);
   if (rm && method === "GET") {
     const machineId = rm[1]!, runtime = rm[2]!;
-    // These are fallbacks when the target machine is absent or its live probe fails. Copilot/Kimi have
-    // no one-shot list command; account-aware discovery still needs an ACP probe (tech-debt I39).
-    const MODELS: Record<string, { id: string; label: string }[]> = {
-      claude: [{ id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" }],
-      codex: CODEX_FALLBACK_MODELS,
-      copilot: [
-        { id: "auto", label: "Auto (recommended)" },
-        { id: "gpt-5.5", label: "GPT-5.5" }, { id: "gpt-5.4", label: "GPT-5.4" }, { id: "gpt-5.2-codex", label: "GPT-5.2 Codex" },
-        { id: "claude-opus-4.7", label: "Claude Opus 4.7" }, { id: "claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
-        { id: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" }, { id: "claude-haiku-4.5", label: "Claude Haiku 4.5" },
-      ],
-      kimi: [{ id: "default", label: "Default (config.toml)" }],
-      opencode: [{ id: "default", label: "Default" }],
-      cursor: [{ id: "default", label: "Default (Composer)" }, { id: "sonnet-4", label: "Sonnet 4" }, { id: "sonnet-4-thinking", label: "Sonnet 4 (thinking)" }, { id: "gpt-5", label: "GPT-5" }],
-      hermes: [{ id: "default", label: "Default profile" }],
-      reasonix: [{ id: "default", label: "Default (config.toml)" }],
-    };
-    // Live discovery for runtimes whose CLI lists its own models: ask THAT machine's daemon to probe,
-    // cache briefly, serve the static list on any miss/offline/timeout (machineId "none" = unbound agent).
+    // Only machine-discovered choices are exposed. A failed probe is not a static catalog.
     // Tenant isolation: machineId is client-supplied, so confirm it belongs to THIS server before routing
     // a probe to it — otherwise a cross-tenant id could enumerate another server's machine model list.
-    if (DYNAMIC_RUNTIMES.has(runtime) && machineId !== "none") {
-      const owns = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, machineId), eq(schema.machines.serverId, serverId))))[0];
-      if (owns) {
-        const models = await getDynamicModels(machineId, runtime);
-        if (models?.length) return (sendJson(res, 200, { models }), true);
-      }
+    const owns = (await db.select().from(schema.machines).where(and(eq(schema.machines.id, machineId), eq(schema.machines.serverId, serverId))))[0];
+    if (!owns) return (sendErr(res, 404, "machine not found"), true);
+    if (owns.status !== "online") return (sendJson(res, 200, { models: [], source: "unavailable", reason: "machine_offline" }), true);
+    if (!Array.isArray(owns.runtimes) || !owns.runtimes.includes(runtime))
+      return (sendJson(res, 200, { models: [], source: "unavailable", reason: "runtime_missing" }), true);
+    if (DYNAMIC_RUNTIMES.has(runtime) && runtime !== "claude") {
+        const models = await getDynamicModels(machineId, runtime, url.searchParams.get("refresh") === "1");
+        if (models?.length) return (sendJson(res, 200, { models, source: "cli", reason: null }), true);
     }
-    return (sendJson(res, 200, { models: MODELS[runtime] ?? [{ id: "default", label: "Default" }] }), true);
+    return (sendJson(res, 200, { models: [], source: "unavailable", reason: runtime === "claude" || !DYNAMIC_RUNTIMES.has(runtime) ? "discovery_unsupported" : "probe_failed" }), true);
   }
   // Reminders (read-only for users): reminders can only be created by the agent side via CLI; user side GETs to list them. ?ownerAgentId=&status=scheduled
   const mprof = /^\/api\/servers\/[^/]+\/members\/([^/]+)\/profile$/.exec(p);
