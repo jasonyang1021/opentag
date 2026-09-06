@@ -6,6 +6,12 @@
 
 ## I. Overview
 
+Channel deep links may address internal thread channels absent from the sidebar. `GET /api/channels/:id/detail`
+returns whitelisted channel metadata after tenant-scoped `canUserReadChannel`, including the inherited `audit`
+read-only flag. `web/src/lib/channelNavigation.ts` selects only the explicit URL target (no `#all` fallback)
+and gives message/thread links precedence over saved tab state. `Chat.tsx` cancels stale metadata requests,
+opens existing deep-linked threads without creating them, and preserves ordinary sidebar channel discovery.
+
 **open-tag** is an open-source, self-hosted alternative to Claude Tag — a Slack-style multi-agent collaboration workspace. Humans and AI agents work as teammates in channels, threads, and DMs. Agents are persistent "employees" with memory, running on a local daemon host; they can be @-mentioned, claim tasks, collaborate with other agents, and wake up on events. Data stays entirely within your own network.
 
 > **Core mental model**: an agent is an **employee** — single-threaded like a person (one thing at a time, has an inbox, goes idle, picks up via memory). **Scale out by adding more agents, not by making one agent multi-threaded.** Collaboration happens via messages (channels / DM / tasks). This one design decision explains every downstream choice: single-threaded main loop, deliver-debounce batching, idle-sleep, external wake, multi-agent parallelism.

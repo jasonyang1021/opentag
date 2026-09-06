@@ -49,6 +49,18 @@ async function unreadMapForUser(userId: string): Promise<Record<string, number>>
 
 export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   const { req, res, url, method, p, userId, serverId } = ctx;
+  // Direct navigation can target a thread, which deliberately isn't in the sidebar list.
+  const detail = p.match(/^\/api\/channels\/([^/]+)\/detail$/);
+  if (detail && method === "GET") {
+    const id = detail[1]!;
+    if (!isUuid(id) || !await canUserReadChannel(serverId, id, userId)) return (sendErr(res, 404, "channel not found"), true);
+    const channel = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, id), eq(schema.channels.serverId, serverId))))[0];
+    if (!channel || channel.deletedAt) return (sendErr(res, 404, "channel not found"), true);
+    return (sendJson(res, 200, {
+      id: channel.id, name: channel.name, description: channel.description, type: channel.type,
+      archivedAt: channel.archivedAt, audit: await isAgentDmAuditChannel(serverId, id),
+    }), true);
+  }
   // ── Threads: a thread is a channel with type=thread (and a parentMessageId); there is no separate /api/threads endpoint ──
   if (p === "/api/channels/threads/followed" && method === "GET") {
     const cms = await db.select().from(schema.channelMembers).where(and(eq(schema.channelMembers.memberType, "user"), eq(schema.channelMembers.memberId, userId)));

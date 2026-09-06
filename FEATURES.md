@@ -49,6 +49,8 @@
 - [ ] Unarchive/restore UI: backend `POST /channels/:id/unarchive` exists but has no frontend surface (archived channels are hidden with no browse toggle). The rest of the old "UI gaps" line shipped: DM creation, private-channel visibility toggle, channel member add/remove, archive are all in the UI (`Chat.tsx`)
 
 ## P4 Tasks & Threads — Implemented (slice03 evidence-driven alignment + end-to-end verified)
+
+- [x] Nested thread navigation: inbox/task links resolve internal thread channels with inherited read access; explicit missing channels never fall back to `#all`.
 - [x] Task field on message: As Task / right-click convert to task; channel + server task lists; convert-message; delete = revert to plain message (source message preserved)
 - [x] Task claim/status flow `todo→in_progress→in_review→done→closed` (claim atomically sets in_progress; non-enum values 400; done auto-creates thread); kanban cards link to source message; socket task events realtime
 - [x] **Board layout toggle** (`TaskBoard.tsx`): horizontal Kanban (default) ↔ vertical stack, persisted in `localStorage["open-tag.tasks.boardLayout"]`; drag-and-drop works in both layouts

@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, Fragment, type CSSPropert
 import { useParams, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
-import { useStore, type Msg, type Att } from "../store.tsx";
+import { useStore, type Msg, type Att, type Channel } from "../store.tsx";
+import { matchesThreadParent, selectChatTab, selectNavigationChannel } from "../lib/channelNavigation";
 import { fmtDateTime, isSameLocalDay, fmtDateDivider } from "../format";
 import { PAGE_SIZE, appendWithCap, nextScrollState } from "../lib/msgPaging";
 import { AGENT_REPLY_PREVIEW_TYPE, AGENT_REPLY_STREAM_TICK_MS, absorbPersistedAgentMessagePreview, applyAgentReplyPreview, dropAgentReplyPreviewsForMessage, hasStreamingAgentReplyPreview, mergePersistedAgentMessageUpdate, renderKeyForMessage, tickAgentReplyPreviews, type AgentReplyEvent, type AgentReplyPreviewMsg } from "../lib/agentReplyPreview";
@@ -212,15 +213,32 @@ export function Chat() {
   const savedUpdatesRef = useRef(new Set<string>());
   const burstCountRef = useRef(0); // how many messages have arrived in the current burst window
   const burstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // resets burstCount after 600ms silence
-  const cur = [...channels, ...dms].find((c) => c.id === channelId) || channels.find((c) => c.name === "all") || channels[0];
+  const [resolvedChannel, setResolvedChannel] = useState<{ slug: string; channel: Channel & { audit?: boolean } } | null>(null);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [channelRetry, setChannelRetry] = useState(0);
+  const knownChannel = [...channels, ...dms].find((c) => c.id === channelId);
+  const cur = selectNavigationChannel<Channel & { audit?: boolean }>(channelId, [...channels, ...dms], resolvedChannel?.slug === slug ? resolvedChannel.channel : null);
+  useEffect(() => {
+    let cancelled = false;
+    setChannelError(null);
+    if (channelId && !knownChannel) {
+      api("GET", `/api/channels/${encodeURIComponent(channelId)}/detail`)
+        .then((channel) => {
+          if (!channel || channel.id !== channelId) throw new Error("channel not found");
+          if (!cancelled) setResolvedChannel({ slug, channel });
+        })
+        .catch(() => { if (!cancelled) { setResolvedChannel(null); setChannelError(channelId); } });
+    }
+    return () => { cancelled = true; };
+  }, [channelId, knownChannel?.id, slug, channelRetry]);
   const curIdRef = useRef<string | undefined>(undefined);
   curIdRef.current = cur?.id; // latest channel id for async guards: a loadOlder that resolves after a channel switch must drop its stale-channel result (no cross-channel prepend / hasMore clobber)
   const isDm = !!dms.find((d) => d.id === cur?.id);
   const dmPeer = dms.find((d) => d.id === cur?.id);
-  const isAuditDm = dmPeer?.audit === true;
+  const isAuditDm = dmPeer?.audit === true || cur?.audit === true;
   const dmAgent = !isAuditDm && dmPeer?.peerType === "agent" ? agents.find((a) => a.id === dmPeer.peerId) : undefined; // ordinary agent DM peer → used for the live status indicator in the header
   const [sp, setSp] = useSearchParams();
-  const chatTab = isAuditDm ? "chat" : sp.get("chatTab") || "chat"; // audited DMs expose only the read-only conversation view
+  const chatTab = selectChatTab(sp, isAuditDm);
   const msgParam = sp.get("msg"); // when present, scroll to and highlight the specified message id
   const threadParam = sp.get("thread"); // auto-open a thread panel (from inbox, in-message thread link, or cross-page link); value is the parent message id (full or 8-char short) or channelId:shortid
 
@@ -240,6 +258,8 @@ export function Chat() {
     setLoaded(false);
     setLoadError(false);
     setHasMore(false);
+    setThread(null);
+    setThreadMeta({});
   }
 
   useEffect(() => { if (!channelId && cur) nav(`/s/${slug}/channel/${cur.id}`, { replace: true }); }, [channelId, cur, slug, nav]);
@@ -301,6 +321,7 @@ export function Chat() {
     // eslint-disable-next-line
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
+    if (!cur) return;
     if (e.type === "message" && e.channelId === cur?.id) { if (e.message.senderType === "user" && e.message.senderId === me?.id) forceBottomPinRef.current = true; setMsgs((m) => { const preview = absorbPersistedAgentMessagePreview(m, e.message); if (preview.consumed) { forceBottomPinRef.current = true; newMsgOrderRef.current.delete(e.message.id); return preview.messages; } const idx = Math.min(burstCountRef.current, 7); newMsgOrderRef.current.set(e.message.id, idx); burstCountRef.current += 1; if (burstTimerRef.current) clearTimeout(burstTimerRef.current); burstTimerRef.current = setTimeout(() => { burstCountRef.current = 0; burstTimerRef.current = null; }, 600); const { next, trimmed } = appendWithCap(dropAgentReplyPreviewsForMessage(m, e.message), e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => mergePersistedAgentMessageUpdate(m, e.message)); // sync reactions, tasks, and finalized Activity tails
     else if (e.type === "agent:reply" && e.channelId === cur?.id) { forceBottomPinRef.current = true; setMsgs((m) => applyAgentReplyPreview(m, e as AgentReplyEvent, agents.find((a) => a.id === e.agentId))); }
@@ -367,20 +388,23 @@ export function Chat() {
     if (el) { highlightedMsgRef.current = msgParam; el.scrollIntoView({ block: "center" }); el.classList.add("msg-hl"); setTimeout(() => el.classList.remove("msg-hl"), 2200); } // no cleanup-cancel: the removal must outlive re-renders, else a re-render cancels the timer and the highlight sticks
     else if (hasMore && !loadingOlderRef.current) void loadOlder(); // target outside the loaded window → page older history (re-runs on each prepend via the msgs dep) until it appears or the channel start is reached
   }, [msgParam, msgs, chatTab, hasMore]);
-  useEffect(() => { // ?thread= auto-opens the thread panel: finds the parent message (full id or 8-char short id) in the loaded list and calls startThread; each threadParam is only opened once
+  const openedThreadLink = useRef<string | null>(null);
+  useEffect(() => { openedThreadLink.current = null; setThread(null); }, [cur?.id, threadParam]);
+  useEffect(() => { // Deep links open existing threads only, once per target (closing must stay closed).
     if (!threadParam || !msgs.length) return;
-    if (thread) return; // panel already open, do not re-open
-    const short = threadParam.includes(":") ? threadParam.split(":").pop()! : threadParam;
-    const m = msgs.find((x) => x.id === threadParam || x.id.startsWith(short));
+    if (openedThreadLink.current === threadParam) return;
+    const m = msgs.find((x) => matchesThreadParent(threadParam, x.id));
     if (m) {
       if (isAuditDm && !threadMeta[m.id]) return; // wait for metadata; oversight must never create a thread
-      void startThread(m);
+      // A deep-link only opens an existing thread; it must not create one on navigation.
+      const tid = threadMeta[m.id]?.threadChannelId;
+      if (tid) { openedThreadLink.current = threadParam; setProfile(null); setThread({ channelId: tid, parent: m }); markRead(tid); }
     }
     else if (hasMore && !loadingOlderRef.current) void loadOlder(); // parent outside the loaded window → page older history until it appears or the channel start is reached
     // eslint-disable-next-line
   }, [threadParam, msgs, hasMore, threadMeta, isAuditDm]);
 
-  const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else n.set("chatTab", t); setSp(n, { replace: true }); };
+  const setTab = (t: string) => { const n = new URLSearchParams(sp); if (t === "chat") n.delete("chatTab"); else { n.set("chatTab", t); n.delete("thread"); n.delete("msg"); } setSp(n, { replace: true }); };
   const doDM = async (agentId: string) => { const id = await openDM("agent", agentId); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by AgentProfile onMessage callback
   const doDMHuman = async (uid: string) => { const id = await openDM("user", uid); if (id) nav(`/s/${slug}/channel/${id}`); }; // used by HumanProfile onMessage callback
   // Opening a thread is an explicit "show me this thread" action → it becomes the right-column base layer and clears any profile overlay on top of it (otherwise the just-opened thread would stay hidden behind a stale profile).
@@ -447,6 +471,9 @@ export function Chat() {
     }
   };
 
+  if (!cur) return <><ChatSidebar /><main className="content-col">{channelError === channelId
+    ? <PaneEmpty icon={<MessageCircle size={30} />} title={t("chat.loadFailedTitle")} sub={<><span>{t("chat.loadFailedBody")}</span><button className="joinbtn" onClick={() => setChannelRetry((n) => n + 1)}>{t("chat.retryLoad")}</button></>} />
+    : <ChatSkeleton />}</main></>;
 
   return (
     <>
@@ -458,7 +485,7 @@ export function Chat() {
             ? <span className="head-status"><span className={"dot " + (agentLiveState(dmAgent) || "offline")} />{agentStateLabel(dmAgent)}</span>
             : <small>{sub || cur?.description || ""}</small>}
           {cur && <div className="chtabs">{(isAuditDm ? ["chat"] : isDm ? ["chat", "tasks"] : ["chat", "tasks", "files"]).map((tt) => <button key={tt} className={chatTab === tt ? "on" : ""} onClick={() => setTab(tt)}>{tt === "chat" ? t("nav.channel") : tt === "tasks" ? t("nav.tasks") : t("common.files")}</button>)}</div>}
-          {!isDm && cur && cur.type !== "showcase" && (
+          {!isDm && cur && cur.type !== "showcase" && cur.type !== "thread" && (
             <div className="chat-head-actions">
               <button className="joinbtn" title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}><Users size={16} /><span className="joinbtn-label">{t("chat.members")}</span></button>
               {capabilities.manageChannels && <button className="joinbtn" title={t("chat.channelSettings")} onClick={() => setShowEdit(true)}>⋯</button>}
@@ -596,7 +623,7 @@ export function Chat() {
               : <Composer
                   channelId={cur?.id ?? ""}
                   placeholder={isDm ? t("chat.dmPlaceholder", { name: cur?.name }) : t("chat.channelPlaceholder")}
-                  allowAsTask
+                  allowAsTask={cur?.type !== "thread"}
                   dmAgent={isDm ? dmAgent : undefined}
                 />}
           </>}
