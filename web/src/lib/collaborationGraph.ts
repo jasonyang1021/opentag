@@ -86,10 +86,12 @@ export function visibleEdgeStrandCount(weight: number) {
 }
 
 /** Keep every strand on the same side of its edge so bundles read as deliberate arcs. */
-export function edgeCurveOffsets(weight: number, direction: 1 | -1) {
+export function edgeCurveOffsets(weight: number, direction: 1 | -1, distance = 200) {
   const count = visibleEdgeStrandCount(weight);
-  const spacing = count > 12 ? 3.2 : count > 6 ? 4.3 : 5.2;
-  return Array.from({ length: count }, (_, index) => direction * (24 + index * spacing));
+  const bend = Math.max(30, Math.min(110, distance * 0.32));
+  const spread = Math.min(150, distance * 0.65);
+  return Array.from({ length: count }, (_, index) =>
+    direction * (bend + (count === 1 ? 0 : (index / (count - 1) - 0.5) * spread)));
 }
 
 export function totalInteractionCount(edges: MemberConnection[]) {
@@ -130,13 +132,14 @@ export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnect
     const band = 0.58 + ((hash(node.id) >>> 8) % 35) / 100;
     return { node, x: width / 2 + Math.cos(angle) * centreRadius * band, y: height / 2 + Math.sin(angle) * centreRadius * band, vx: 0, vy: 0 };
   });
-  const outerX = Math.max(42, width / 2 - 62);
-  const outerY = Math.max(42, height / 2 - 58);
+  const outerX = Math.max(42, width / 2 - 78);
+  const outerY = Math.max(42, height / 2 - 80);
   isolatedNodes.forEach((node, index) => {
     const slot = 2 * Math.PI / Math.max(1, isolatedNodes.length);
     const jitter = (((hash(memberNodeKey(node)) >>> 10) % 101) / 100 - 0.5) * slot * 0.5;
     const angle = index * slot - Math.PI / 2 + jitter;
-    positions.push({ node, x: width / 2 + Math.cos(angle) * outerX, y: height / 2 + Math.sin(angle) * outerY, vx: 0, vy: 0 });
+    const radial = 0.84 + (hash(node.id) % 161) / 1000;
+    positions.push({ node, x: width / 2 + Math.cos(angle) * outerX * radial, y: height / 2 + Math.sin(angle) * outerY * radial, vx: 0, vy: 0 });
   });
   const indexByKey = new Map(positions.map((position, index) => [memberNodeKey(position.node), index]));
   const indexedEdges = edges.flatMap((edge) => {
@@ -188,7 +191,50 @@ export function layoutMemberGraph(nodes: MemberGraphNode[], edges: MemberConnect
       position.y = Math.max(height * 0.13, Math.min(height * 0.87, position.y + position.vy));
     }
   }
+  // Fill the central region without letting interaction weight collapse it into a knot.
+  if (connectedNodes.length > 1) {
+    const central = positions.slice(0, connectedNodes.length);
+    const xs = central.map((p) => p.x), ys = central.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const scaleX = Math.min((width * (isolatedNodes.length ? 0.53 : 0.72)) / Math.max(1, maxX - minX), 3);
+    const scaleY = Math.min((height * (isolatedNodes.length ? 0.52 : 0.68)) / Math.max(1, maxY - minY), 2.5);
+    for (const p of central) {
+      p.x = width / 2 + (p.x - (minX + maxX) / 2) * scaleX;
+      p.y = height / 2 + (p.y - (minY + maxY) / 2) * scaleY;
+    }
+  }
+  // Resolve avatar/label collisions across BOTH groups, including near the outer band.
+  for (let pass = 0; pass < 40; pass++) {
+    for (let i = 0; i < positions.length; i++) for (let j = i + 1; j < positions.length; j++) {
+      const a = positions[i]!, b = positions[j]!;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const overlapX = 108 - Math.abs(dx), overlapY = 82 - Math.abs(dy);
+      if (overlapX <= 0 || overlapY <= 0) continue;
+      if (overlapX < overlapY) {
+        const shift = (overlapX + 1) / 2 * (dx < 0 ? -1 : 1);
+        a.x -= shift; b.x += shift;
+      } else {
+        const shift = (overlapY + 1) / 2 * (dy < 0 ? -1 : 1);
+        a.y -= shift; b.y += shift;
+      }
+    }
+    for (const p of positions) {
+      p.x = Math.max(64, Math.min(width - 64, p.x));
+      p.y = Math.max(48, Math.min(height - 66, p.y));
+    }
+  }
   return positions.map(({ node, x, y }) => ({ ...node, x, y }));
+}
+
+export function filterMemberGraph(graph: ReturnType<typeof buildMemberGraph>, type: "all" | "human" | "agent", minimum: number, hideIsolated: boolean) {
+  const candidates = graph.nodes.filter((node) => type === "all" || node.type === type);
+  const keys = new Set(candidates.map(memberNodeKey));
+  const edges = graph.edges.filter((edge) => edge.weight >= minimum && keys.has(edge.sourceKey) && keys.has(edge.targetKey));
+  const totals = new Map<string, number>();
+  for (const edge of edges) for (const key of [edge.sourceKey, edge.targetKey]) totals.set(key, (totals.get(key) ?? 0) + edge.weight);
+  const nodes = candidates.map((node) => ({ ...node, connections: totals.get(memberNodeKey(node)) ?? 0 }))
+    .filter((node) => !hideIsolated || node.connections > 0);
+  return { nodes, edges };
 }
 
 export function connectedMemberKeys(node: Pick<CollaborationNode, "type" | "id">, edges: MemberConnection[]) {

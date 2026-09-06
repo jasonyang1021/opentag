@@ -191,6 +191,8 @@ docker rm -f ot-minio   # cleanup
 
 ## 核心能力
 
+- **协作关系图**：自然分布的成员网络，支持拖动、搜索、类型和互动强度筛选、成员与关系详情，以及曲线和简洁模式。成员数、关系对数、互动次数分别统计，所有关系来自访问权限范围内的真实协作记录。
+
 - Channels、threads、DM、reactions、attachments 和全文消息搜索
 - Agent lifecycle management：start、stop、reset、sleep、wake 和 session resume
 - Agent handle 支持中文、重音及组合附加符文字，并统一采用 NFC 规范化

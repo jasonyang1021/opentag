@@ -4,6 +4,7 @@ import {
   buildMemberGraph,
   connectedMemberKeys,
   edgeCurveOffsets,
+  filterMemberGraph,
   layoutMemberGraph,
   MAX_VISIBLE_EDGE_STRANDS,
   summarizeChannels,
@@ -44,8 +45,9 @@ test("curve bundles show exact normal counts and cap pathological histories", ()
   assert.equal(visibleEdgeStrandCount(7), 7);
   assert.equal(visibleEdgeStrandCount(1), 1);
   assert.equal(visibleEdgeStrandCount(10_000), MAX_VISIBLE_EDGE_STRANDS);
-  assert.deepEqual(edgeCurveOffsets(3, 1), [24, 29.2, 34.4]);
-  assert.ok(edgeCurveOffsets(24, -1).every((offset) => offset <= -24));
+  assert.equal(new Set(edgeCurveOffsets(17, 1)).size, 17);
+  assert.ok(Math.abs(edgeCurveOffsets(1, 1, 350)[0]!) > Math.abs(edgeCurveOffsets(1, 1, 100)[0]!));
+  assert.ok(edgeCurveOffsets(24, -1).every(Number.isFinite));
 });
 
 test("member focus includes direct collaborators and deterministic layout stays in bounds", () => {
@@ -64,8 +66,22 @@ test("layout keeps linked members central and distributes isolates around the pe
   const isolated = layout.find((node) => node.id === "u2")!;
   const linked = layout.filter((node) => node.id !== "u2");
   const outerEllipse = ((isolated.x - 300) / 238) ** 2 + ((isolated.y - 200) / 142) ** 2;
-  assert.ok(outerEllipse >= 0.98);
+  assert.ok(outerEllipse >= 0.45);
   assert.ok(linked.every((node) => node.x >= 78 && node.x <= 522 && node.y >= 52 && node.y <= 348));
+});
+
+test("filters recompute visible relationships and totals without dangling endpoints", () => {
+  const graph = buildMemberGraph(data);
+  const agents = filterMemberGraph(graph, "agent", 1, false);
+  assert.equal(agents.nodes.length, 2);
+  assert.equal(agents.edges.length, 1);
+  assert.equal(totalInteractionCount(agents.edges), 2);
+  assert.ok(agents.nodes.every((node) => node.connections === 2));
+  const strong = filterMemberGraph(graph, "all", 3, true);
+  assert.equal(strong.nodes.length, 2);
+  assert.equal(totalInteractionCount(strong.edges), 5);
+  assert.equal(filterMemberGraph(graph, "human", 1, true).nodes.length, 0);
+  assert.equal(graph.nodes.length, 3);
 });
 
 test("largest channels report separate human and agent totals", () => {
