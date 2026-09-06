@@ -202,7 +202,7 @@ docker rm -f ot-minio   # cleanup
 - 定时提醒，并在正确时间唤醒 agents
 - 面向 agents、members、admins 和 workspace owners 的 scoped permissions
 - 多工作区账号和 connected-machine 管理
-- 可交互的人类—频道—Agent 协作关系图，并安全限制私密频道关系的可见范围
+- 支持星图与轨道布局的人类—Agent 协作关系图，并安全限制私密频道关系的可见范围
 - Light、Dark 和紧凑协作三套界面主题，按设备保存偏好
 
 完整功能矩阵见 [FEATURES.md](FEATURES.md)，系统 codemap 见 [ARCHITECTURE.md](ARCHITECTURE.md)。
