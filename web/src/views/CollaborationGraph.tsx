@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, GitBranch, Hash, Maximize2, RefreshCw, Search, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowUpRight, GitBranch, Hash, Maximize2, RefreshCw, Search, X, ZoomIn, ZoomOut, Sparkles, Orbit, Moon, Sun, Pause, Play, Compass } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { useStore } from "../store.tsx";
 import { buildMemberGraph, connectedMemberKeys, edgeCurveOffsets, filterMemberGraph, layoutMemberGraph,
-  memberNodeKey, summarizeChannels, totalInteractionCount, type CollaborationGraphData, type MemberGraphNode } from "../lib/collaborationGraph.ts";
+  shortestMemberPath, layoutOrbitGraph, memberNodeKey, summarizeChannels, totalInteractionCount, type CollaborationGraphData, type MemberGraphNode } from "../lib/collaborationGraph.ts";
 import "./collaborationGraph.css";
 
 const EMPTY: CollaborationGraphData = { humans: [], agents: [], channels: [], memberships: [], interactions: [] };
@@ -31,7 +31,12 @@ export function CollaborationGraph() {
   const [type, setType] = useState<"all" | "human" | "agent">("all");
   const [minimum, setMinimum] = useState(1);
   const [hideIsolated, setHideIsolated] = useState(false);
-  const [strands, setStrands] = useState(true);
+  const [strands, setStrands] = useState(false);
+  const [night, setNight] = useState(true);
+  const [motion, setMotion] = useState(false);
+  const [orbit, setOrbit] = useState(false);
+  const [routeStart, setRouteStart] = useState<string | null>(null);
+  const [routeEnd, setRouteEnd] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
   const [manual, setManual] = useState<Record<string, Point>>({});
@@ -50,7 +55,7 @@ export function CollaborationGraph() {
     finally { if (id === request.current) setLoading(false); }
   }, []);
   useEffect(() => {
-    setData(null); setSelected(null); setSelectedEdge(null); setHovered(null); setManual({});
+    setData(null); setSelected(null); setSelectedEdge(null); setHovered(null); setManual({}); setRouteStart(null); setRouteEnd(null);
     void load();
     return () => { request.current++; };
   }, [serverId, load]);
@@ -69,7 +74,7 @@ export function CollaborationGraph() {
   const fullGraph = useMemo(() => buildMemberGraph(data ?? EMPTY), [data]);
   const graph = useMemo(() => filterMemberGraph(fullGraph, type, minimum, hideIsolated), [fullGraph, type, minimum, hideIsolated]);
   const width = Math.max(640, size.width), height = Math.max(520, size.height);
-  const layout = useMemo(() => layoutMemberGraph(graph.nodes, graph.edges, width, height), [graph, width, height]);
+  const layout = useMemo(() => orbit ? layoutOrbitGraph(graph.nodes, width, height) : layoutMemberGraph(graph.nodes, graph.edges, width, height), [graph, width, height, orbit]);
   const positions = useMemo(() => new Map(layout.map((node) => [memberNodeKey(node), { ...node, ...manual[memberNodeKey(node)] }])), [layout, manual]);
   const edgeLabels = useMemo(() => {
     const labels = new Map<string, Point>();
@@ -95,8 +100,10 @@ export function CollaborationGraph() {
   }, [graph.edges, positions, strands]);
   const selectedNode = graph.nodes.find((node) => memberNodeKey(node) === selected);
   const edge = graph.edges.find((item) => pairKey(item.sourceKey, item.targetKey) === selectedEdge);
-  const focus = selectedNode ?? graph.nodes.find((node) => memberNodeKey(node) === hovered);
-  const connected = useMemo(() => focus ? connectedMemberKeys(focus, graph.edges) : edge ? new Set([edge.sourceKey, edge.targetKey]) : null, [focus, edge, graph.edges]);
+  const route = useMemo(() => routeStart && routeEnd ? shortestMemberPath(routeStart, routeEnd, graph.edges) : null, [routeStart, routeEnd, graph.edges]);
+  const routeEdges = useMemo(() => new Set(route?.slice(1).map((key, i) => [route[i]!, key].sort().join("|")) ?? []), [route]);
+  const focus = routeStart ? null : selectedNode ?? graph.nodes.find((node) => memberNodeKey(node) === hovered);
+  const connected = useMemo(() => routeStart && routeEnd ? new Set(route ?? [routeStart, routeEnd]) : focus ? connectedMemberKeys(focus, graph.edges) : edge ? new Set([edge.sourceKey, edge.targetKey]) : null, [routeStart, routeEnd, route, focus, edge, graph.edges]);
   const matching = useMemo(() => new Set(graph.nodes.filter((node) => (displayName(node) + " " + node.name).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).map(memberNodeKey)), [graph.nodes, query]);
   const ranked = useMemo(() => [...graph.nodes].filter((node) => node.connections > 0).sort((a, b) => b.connections - a.connections || displayName(a).localeCompare(displayName(b))), [graph.nodes]);
   const collaborators = useMemo(() => !selectedNode ? [] : graph.edges.flatMap((item) => {
@@ -107,8 +114,8 @@ export function CollaborationGraph() {
   }).sort((a, b) => b.weight - a.weight), [selectedNode, graph.edges, positions]);
   const channels = useMemo(() => summarizeChannels(data ?? EMPTY), [data]);
   const totals = totalInteractionCount(graph.edges);
-  const clearFocus = () => { setSelected(null); setSelectedEdge(null); setHovered(null); };
-  const selectNode = (key: string) => { setSelected(key); setSelectedEdge(null); setHovered(null); setQuery(""); };
+  const clearFocus = () => { setSelected(null); setSelectedEdge(null); setHovered(null); setRouteStart(null); setRouteEnd(null); };
+  const selectNode = (key: string) => { if (routeStart) { setRouteEnd(key); setSelected(null); } else setSelected(key); setSelectedEdge(null); setHovered(null); setQuery(""); };
   const reset = () => { const scale = Math.min(1, size.width / width); setViewport({ x: 0, y: (size.height - height * scale) / 2, scale }); setManual({}); clearFocus(); };
   const resetFilters = () => { setQuery(""); setType("all"); setMinimum(1); setHideIsolated(false); clearFocus(); };
   const openMember = (node: MemberGraphNode) => navigate(`/s/${slug}/${node.type === "agent" ? "agent" : "human"}/${node.id}`);
@@ -118,6 +125,7 @@ export function CollaborationGraph() {
     return { scale, x: p.x - (p.x - v.x) * scale / v.scale, y: p.y - (p.y - v.y) * scale / v.scale };
   });
   useEffect(() => {
+    if (routeStart && (!graph.nodes.some(node => memberNodeKey(node) === routeStart) || (routeEnd && !graph.nodes.some(node => memberNodeKey(node) === routeEnd)))) { setRouteStart(null); setRouteEnd(null); }
     const el = canvas.current;
     if (!el) return;
     const wheel = (event: WheelEvent) => {
@@ -131,16 +139,21 @@ export function CollaborationGraph() {
   useEffect(() => {
     if (selected && !graph.nodes.some((node) => memberNodeKey(node) === selected)) setSelected(null);
     if (selectedEdge && !graph.edges.some((item) => pairKey(item.sourceKey, item.targetKey) === selectedEdge)) setSelectedEdge(null);
-  }, [graph, selected, selectedEdge]);
+  }, [graph, selected, selectedEdge, routeStart, routeEnd]);
   const filtersActive = type !== "all" || minimum !== 1 || hideIsolated || !!query;
   const avatar = (node: MemberGraphNode, px = 38) => <Avatar seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={px} />;
 
-  return <div className={`gx${expanded ? " gx-expanded" : ""}`} onKeyDown={(event) => {
+  return <div className={`gx gx-atlas${night ? " gx-night" : ""}${motion ? " gx-motion" : ""}${expanded ? " gx-expanded" : ""}`} onKeyDown={(event) => {
     if (event.key === "Escape") { clearFocus(); setExpanded(false); }
   }}>
     <div className="gx-heading">
       <div><span className="gx-eyebrow">{t("graphExplorer.eyebrow")}</span><h2>{t("graphExplorer.title")}</h2><p>{t("graphExplorer.subtitle")}</p></div>
-      <button className="gx-button" onClick={() => void load()} disabled={loading}><RefreshCw size={14} className={loading ? "gx-spin" : ""} />{t("members.graphRefresh")}</button>
+      <div className="gx-heading-actions"><button className="gx-button" aria-label={t(night ? "graphExplorer.day" : "graphExplorer.night")} onClick={() => setNight(!night)}>{night ? <Sun size={16} /> : <Moon size={16} />}</button><button className="gx-button" onClick={() => void load()} disabled={loading}><RefreshCw size={14} className={loading ? "gx-spin" : ""} />{t("members.graphRefresh")}</button></div>
+    </div>
+    <div className="gx-experience">
+      <div className="gx-segment" aria-label={t("graphExplorer.layout")}><button aria-pressed={!orbit} onClick={() => { setOrbit(false); reset(); }}><Sparkles size={14} />{t("graphExplorer.constellation")}</button><button aria-pressed={orbit} onClick={() => { setOrbit(true); reset(); }}><Orbit size={14} />{t("graphExplorer.orbit")}</button></div>
+      <button className="gx-discover" disabled={!graph.nodes.length} onClick={() => { const pool = graph.nodes.filter(node => memberNodeKey(node) !== selected); const node = pool[Math.floor(Math.random() * pool.length)] ?? graph.nodes[0]; if (node) { reset(); setSelected(memberNodeKey(node)); setQuery(""); } }}><Compass size={16} />{t("graphExplorer.discover")}<ArrowUpRight size={14} /></button>
+      <button className="gx-motion-toggle" aria-pressed={motion} title={t("graphExplorer.motionHint")} onClick={() => setMotion(!motion)}>{motion ? <Pause size={13} /> : <Play size={13} />}{t("graphExplorer.motion")}</button>
     </div>
     <div className="gx-filters">
       <label className="gx-search"><Search size={16} /><input aria-label={t("graphExplorer.search")} placeholder={t("graphExplorer.search")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => {
@@ -188,11 +201,12 @@ export function CollaborationGraph() {
       >
         <div className="gx-map-caption" data-controls><span className="gx-live-dot" />{t("graphExplorer.visible", { count: graph.nodes.length })}<span>·</span>{t("graphExplorer.relationshipCount", { count: graph.edges.length })}</div>
         <div className="gx-stage" style={{ width, height, transform: `translate(${viewport.x}px,${viewport.y}px) scale(${viewport.scale})` }}>
+          <div className="gx-orbits" aria-hidden="true"><i /><i /><i /></div>
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-label={t("members.graphAriaLabel")}>
             {graph.edges.map((item) => {
               const a = positions.get(item.sourceKey)!, b = positions.get(item.targetKey)!;
               const key = pairKey(item.sourceKey, item.targetKey);
-              const active = focus ? item.sourceKey === memberNodeKey(focus) || item.targetKey === memberNodeKey(focus) : selectedEdge === key;
+              const active = routeStart ? routeEdges.has(key) : focus ? item.sourceKey === memberNodeKey(focus) || item.targetKey === memberNodeKey(focus) : selectedEdge === key;
               const dim = (!!connected && !active) || (!!query.trim() && !matching.has(item.sourceKey) && !matching.has(item.targetKey));
               const dx = b.x - a.x, dy = b.y - a.y, distance = Math.hypot(dx, dy) || 1;
               const direction = [...key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 ? 1 : -1;
@@ -203,15 +217,16 @@ export function CollaborationGraph() {
               const label = `${displayName(a)} ↔ ${displayName(b)} · ${t("members.graphInteractionCount", { count: item.weight })}`;
               return <g key={key} className={`gx-edge${active ? " active" : ""}${dim ? " dim" : ""}`}>
                 {offsets.map((offset, index) => <path className="gx-strand" key={index} d={path(offset)} style={!strands ? { strokeWidth: clamp(Math.log2(item.weight + 1), 1, 4) } : undefined} />)}
-                <path className="gx-edge-hit" data-edge={key} d={path(middle)} role="button" tabIndex={0} aria-label={label} onClick={() => { setSelected(null); setSelectedEdge(key); setHovered(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(null); setSelectedEdge(key); setHovered(null); } }}><title>{label}</title></path>
+                {motion && <path className="gx-flow" d={path(middle)} pathLength={100} aria-hidden="true" />}
+                <path className="gx-edge-hit" data-edge={key} d={path(middle)} role="button" tabIndex={0} aria-label={label} onClick={() => { clearFocus(); setSelectedEdge(key); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clearFocus(); setSelectedEdge(key); } }}><title>{label}</title></path>
                 {active && <g className="gx-edge-count" transform={`translate(${labelPosition.x},${labelPosition.y})`}><rect x={-17} y={-11} width={34} height={22} rx={11} /><text textAnchor="middle" dy="4">{item.weight}</text></g>}
               </g>;
             })}
           </svg>
           {[...positions.values()].map((node) => {
             const key = memberNodeKey(node), dim = (!!connected && !connected.has(key)) || (!!query.trim() && !matching.has(key));
-            return <button key={key} data-node={key} aria-pressed={selected === key}
+            return <button key={key} data-node={key} aria-pressed={selected === key || routeStart === key || routeEnd === key}
               className={`gx-node ${node.type}${node.connections ? "" : " isolated"}${dim ? " dim" : ""}${selected === key ? " selected" : ""}${query.trim() && matching.has(key) ? " match" : ""}`}
               style={{ left: node.x, top: node.y }}
               onDragStart={(event) => event.preventDefault()}
@@ -219,7 +234,7 @@ export function CollaborationGraph() {
               onFocus={() => setHovered(key)} onBlur={() => setHovered(null)}
               onClick={(event) => { if (event.detail === 0 || !suppressClick.current) selectNode(key); }}
               title={`${displayName(node)} · ${t("members.graphInteractionCount", { count: node.connections })}`}>
-              <span className="gx-avatar">{avatar(node)}{node.type === "agent" && <span className={`dot ${node.status || "inactive"}`} />}</span>
+              <span className="gx-avatar">{avatar(node)}{node.type === "agent" && <span className={`dot ${node.status || "inactive"}`} />}{node.connections > 0 && <span className="gx-node-count" aria-hidden="true">{node.connections}</span>}</span>
               <span className="gx-node-name">{displayName(node)}</span>
             </button>;
           })}
@@ -238,11 +253,17 @@ export function CollaborationGraph() {
       </div>
       <aside className="gx-insights">
         <div className="gx-stats"><div><b>{graph.nodes.length}</b><span>{t("graphExplorer.members")}</span></div><div><b>{graph.edges.length}</b><span>{t("graphExplorer.relationships")}</span></div><div><b>{totals}</b><span>{t("graphExplorer.interactions")}</span></div></div>
-        {selectedNode ? <section className="gx-card gx-detail">
+        {routeStart && positions.has(routeStart) && (!routeEnd || positions.has(routeEnd)) ? <section className="gx-card gx-detail gx-route" aria-live="polite">
+          <div className="gx-card-heading"><h3>{t("graphExplorer.pathTitle")}</h3><button aria-label={t("graphExplorer.closeDetail")} onClick={clearFocus}><X size={16} /></button></div>
+          <p>{t("graphExplorer.pathFrom", { name: displayName(positions.get(routeStart)!) })}</p>
+          {!routeEnd ? <p>{t("graphExplorer.pickDestination")}</p> : route ? <><div className="gx-interaction-total"><b>{route.length - 1}</b><span>{t("graphExplorer.hops")}</span></div><ol>{route.map((key) => { const node = positions.get(key)!; return <li key={key}>{avatar(node, 28)}<span>{displayName(node)}</span></li>; })}</ol></> : <p>{t("graphExplorer.noPath")}</p>}
+          <p className="gx-source">{t("graphExplorer.pathHint")}</p><button className="gx-button" onClick={clearFocus}>{t("graphExplorer.exitPath")}</button>
+        </section> : selectedNode ? <section className="gx-card gx-detail">
           <div className="gx-card-heading"><h3>{t("graphExplorer.memberDetail")}</h3><button aria-label={t("graphExplorer.closeDetail")} onClick={clearFocus}><X size={16} /></button></div>
           <div className="gx-person">{avatar(selectedNode, 46)}<div><h4>{displayName(selectedNode)}</h4><span>{t("graphExplorer." + selectedNode.type)}</span></div></div>
           <p>{t("graphExplorer.memberSummary", { count: collaborators.length, interactions: selectedNode.connections })}</p>
           <button className="gx-button gx-profile" onClick={() => openMember(selectedNode)}>{t("graphExplorer.profile")}<ArrowUpRight size={14} /></button>
+          <button className="gx-button gx-profile" onClick={() => { setRouteStart(memberNodeKey(selectedNode)); setRouteEnd(null); setHovered(null); }}><GitBranch size={14} />{t("graphExplorer.findPath")}</button>
           <h3>{t("graphExplorer.collaborators")}</h3>
           {!collaborators.length && <p>{t("graphExplorer.noInteractions")}</p>}
           <div className="gx-list">{collaborators.map(({ node, weight }) => <button key={memberNodeKey(node)} onClick={() => selectNode(memberNodeKey(node))}>{avatar(node, 24)}<span>{displayName(node)}</span><b title={t("graphExplorer.interactions")}>{weight}</b></button>)}</div>
@@ -256,7 +277,7 @@ export function CollaborationGraph() {
           <div className="gx-list">{ranked.slice(0, 6).map((node, index) => <button key={memberNodeKey(node)} onClick={() => selectNode(memberNodeKey(node))}><small>{String(index + 1).padStart(2, "0")}</small>{avatar(node, 24)}<span>{displayName(node)}</span><b>{node.connections}</b></button>)}</div>
           {!ranked.length && <p>{t("graphExplorer.noInteractions")}</p>}
         </section>}
-        <section className="gx-card gx-guide"><h3>{t("graphExplorer.explore")}</h3><p>{t("graphExplorer.guide")}</p><p className="gx-source">{t("graphExplorer.source")}</p></section>
+        <section className="gx-card gx-guide"><Sparkles size={20} /><h3>{t("graphExplorer.explore")}</h3><p>{t("graphExplorer.guide")}</p><p>{t("graphExplorer.motionHint")}</p><p className="gx-source">{t("graphExplorer.source")}</p></section>
         <section className="gx-card gx-channel-card"><h3>{t("members.graphLargestChannels")}</h3><div className="gx-list">{channels.map((channel) => <button key={channel.id} onClick={() => navigate(`/s/${slug}/channel/${channel.id}`)}><Hash size={14} /><span>{channel.name}</span><small>{channel.humanCount}H / {channel.agentCount}A</small><ArrowUpRight size={13} /></button>)}</div></section>
       </aside>
     </div>

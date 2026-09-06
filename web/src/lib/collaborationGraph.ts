@@ -246,3 +246,63 @@ export function connectedMemberKeys(node: Pick<CollaborationNode, "type" | "id">
   }
   return keys;
 }
+
+/** Fewest-hop path through existing visible relationships; null means no evidence-backed route. */
+export function shortestMemberPath(source: string, target: string, edges: MemberConnection[]): string[] | null {
+  if (source === target) return [source];
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edges) {
+    adjacency.set(edge.sourceKey, [...(adjacency.get(edge.sourceKey) ?? []), edge.targetKey]);
+    adjacency.set(edge.targetKey, [...(adjacency.get(edge.targetKey) ?? []), edge.sourceKey]);
+  }
+  const parent = new Map<string, string | null>([[source, null]]), queue = [source];
+  for (let i = 0; i < queue.length; i++) {
+    const key = queue[i]!;
+    for (const next of [...(adjacency.get(key) ?? [])].sort()) {
+      if (parent.has(next)) continue;
+      parent.set(next, key);
+      if (next === target) {
+        const path = [target];
+        let cursor = key;
+        while (cursor !== source) { path.push(cursor); cursor = parent.get(cursor)!; }
+        return [source, ...path.reverse()];
+      }
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
+/** Ordered inner orbits for collaborators, an outer orbit for members without evidence. */
+export function layoutOrbitGraph(nodes: MemberGraphNode[], width = 1040, height = 640): PositionedMemberGraphNode[] {
+  const sorted = [...nodes].sort((a, b) => b.connections - a.connections || memberNodeKey(a).localeCompare(memberNodeKey(b)));
+  if (sorted.length < 2) return sorted.map(node => ({ ...node, x: width / 2, y: height / 2 }));
+  const active = sorted.filter(node => node.connections > 0), quiet = sorted.filter(node => !node.connections);
+  const rings: MemberGraphNode[][] = [];
+  for (let i = 0; i < active.length; i += 10) rings.push(active.slice(i, i + 10));
+  const activeRings = rings.length;
+  for (let i = 0; i < quiet.length; i += 16) rings.push(quiet.slice(i, i + 16));
+  const positions = rings.flatMap((ring, index) => {
+    const radius = index < activeRings ? (quiet.length ? .46 : .75) * (index + 1) / activeRings : .88 + .08 * (index - activeRings) / Math.max(1, rings.length - activeRings);
+    return ring.map((node, slot) => {
+      const angle = slot * Math.PI * 2 / ring.length - Math.PI / 2 + index * .28;
+      return { ...node, x: width / 2 + Math.cos(angle) * (width / 2 - 70) * radius, y: height / 2 + Math.sin(angle) * (height / 2 - 85) * radius };
+    });
+  });
+  // Orbit slots are starting points, not rigid tracks: preserve readable labels.
+  for (let pass = 0; pass < 50; pass++) {
+    for (let i = 0; i < positions.length; i++) for (let j = i + 1; j < positions.length; j++) {
+      const a = positions[i]!, b = positions[j]!;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const ox = 114 - Math.abs(dx), oy = 86 - Math.abs(dy);
+      if (ox <= 0 || oy <= 0) continue;
+      if (ox < oy) { const move = (ox + 1) / 2 * (dx < 0 ? -1 : 1); a.x -= move; b.x += move; }
+      else { const move = (oy + 1) / 2 * (dy < 0 ? -1 : 1); a.y -= move; b.y += move; }
+    }
+    for (const point of positions) {
+      point.x = Math.max(64, Math.min(width - 64, point.x));
+      point.y = Math.max(64, Math.min(height - 75, point.y));
+    }
+  }
+  return positions;
+}

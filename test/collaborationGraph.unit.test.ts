@@ -6,6 +6,8 @@ import {
   edgeCurveOffsets,
   filterMemberGraph,
   layoutMemberGraph,
+  layoutOrbitGraph,
+  shortestMemberPath,
   MAX_VISIBLE_EDGE_STRANDS,
   summarizeChannels,
   totalInteractionCount,
@@ -86,4 +88,26 @@ test("filters recompute visible relationships and totals without dangling endpoi
 
 test("largest channels report separate human and agent totals", () => {
   assert.deepEqual(summarizeChannels(data, 1), [{ id: "c1", name: "product", humanCount: 1, agentCount: 2, total: 3 }]);
+});
+
+test("orbit layout is deterministic, bounded and preserves members without changing evidence", () => {
+  const graph = buildMemberGraph({ ...data, humans: [...data.humans, { id: "quiet", type: "human", name: "Quiet" }] });
+  const before = structuredClone(graph.nodes);
+  const positions = layoutOrbitGraph(graph.nodes, 1040, 640);
+  assert.deepEqual(positions, layoutOrbitGraph([...graph.nodes].reverse(), 1040, 640));
+  assert.deepEqual(graph.nodes, before);
+  assert.equal(positions.length, graph.nodes.length);
+  assert.ok(positions.every(p => Number.isFinite(p.x) && p.x >= 64 && p.x <= 976 && p.y >= 64 && p.y <= 565));
+  assert.deepEqual(layoutOrbitGraph([], 640, 520), []);
+  assert.equal(layoutOrbitGraph([graph.nodes[0]!], 640, 520)[0]!.x, 320);
+});
+
+test("connection trails use shortest existing paths and handle disconnected members and cycles", () => {
+  const { edges } = buildMemberGraph(data);
+  assert.deepEqual(shortestMemberPath("human:u1", "agent:a2", edges), ["human:u1", "agent:a1", "agent:a2"]);
+  assert.deepEqual(shortestMemberPath("agent:a1", "human:u1", edges), ["agent:a1", "human:u1"]);
+  assert.equal(shortestMemberPath("human:u1", "missing", edges), null);
+  assert.deepEqual(shortestMemberPath("human:u1", "human:u1", edges), ["human:u1"]);
+  const triangle = [...edges, { sourceKey: "human:u1", targetKey: "agent:a2", channelIds: [], weight: 1 }];
+  assert.deepEqual(shortestMemberPath("human:u1", "agent:a2", triangle), ["human:u1", "agent:a2"]);
 });
