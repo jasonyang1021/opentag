@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { readFile, writeFile, mkdir, appendFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { createLogger } from "../log.js";
+import { readBody } from "./input.js";
 
 const log = createLogger("cli");
 const BASE = process.env.OPEN_TAG_SERVER_URL ?? "http://localhost:7777";
@@ -36,12 +37,6 @@ async function api(method: string, path: string, body?: unknown): Promise<any> {
     log.error("api failed", { method, path, detail: String(e?.message ?? e) });
     process.exit(1);
   }
-}
-function readStdin(): Promise<string> {
-  return new Promise((resolve) => {
-    if (process.stdin.isTTY) return resolve("");
-    let d = ""; process.stdin.on("data", (c) => (d += c)); process.stdin.on("end", () => resolve(d));
-  });
 }
 function targetFromText(text: string): string | null {
   const m = /^\[target=([^\s\]]+)/.exec(text);
@@ -94,11 +89,12 @@ message.command("decide").description("record whether and why this agent should 
     await recordTurnEvent({ type: "decision", messageId: d.messageId, decision: d.decision, grant: d.grant });
     console.log(`Decision ${d.decision} for ${String(d.messageId).slice(0, 8)}; grant=${d.grant ?? "none"}${d.promotedAgentId ? `; promoted=${String(d.promotedAgentId).slice(0, 8)}` : ""}`);
   });
-message.command("send").description("send a granted reply (body read from stdin); if newer messages arrived it is freshness-held as a draft").requiredOption("--target <target>", "#channel / dm:@name / #channel:shortid / thread:shortid").option("--reply-to <id>", "trigger message full/short id").option("--attach <ids>", "attachment ids, comma-separated").option("--send-draft", "submit the held draft as-is after reply authorization").action(async (opts) => {
+message.command("send").description("send a granted reply (UTF-8 stdin or --body-file); if newer messages arrived it is freshness-held as a draft").requiredOption("--target <target>", "#channel / dm:@name / #channel:shortid / thread:shortid").option("--reply-to <id>", "trigger message full/short id").option("--attach <ids>", "attachment ids, comma-separated").option("--body-file <path>", "read body directly from a UTF-8 file instead of stdin").option("--send-draft", "submit the held draft as-is after reply authorization").action(async (opts) => {
   const sendDraft = !!opts.sendDraft;
-  const content = sendDraft ? "" : (await readStdin()).trim();
+  if (sendDraft && opts.bodyFile !== undefined) throw new Error("--body-file cannot be combined with --send-draft");
+  const content = sendDraft ? "" : (await readBody(opts.bodyFile)).trim();
   const attachmentIds = opts.attach ? String(opts.attach).split(",").map((s: string) => s.trim()).filter(Boolean) : [];
-  if (!sendDraft && !content && !attachmentIds.length) { console.error("Error: empty content"); console.error("Next action: pipe body via heredoc on stdin, or use --attach to include attachments"); process.exit(1); }
+  if (!sendDraft && !content && !attachmentIds.length) { console.error("Error: empty content"); console.error("Next action: provide UTF-8 stdin or --body-file, or use --attach to include attachments"); process.exit(1); }
   const d = await api("POST", "/agent-api/message/send", { target: opts.target, content, attachmentIds, sendDraft, replyTo: opts.replyTo });
   if (d.held) { await recordTurnEvent({ type: "held", target: opts.target }); return console.log(d.text); } // freshness-hold: prints bounded context + two options, letting the agent revise or use --send-draft
   await recordTurnEvent({ type: "send", target: opts.target, id: d.id, seq: d.seq });
@@ -195,9 +191,9 @@ message.command("search").description("full-text search messages in your channel
 program.command("search").description("= message search (backward-compat alias)").requiredOption("--query <q>", "search term").action(searchAction);
 
 const thread = program.command("thread").description("threads");
-thread.command("reply").description("start or reply to a thread under a message (body read from stdin)").requiredOption("--parent <msgId>", "parent message id or the 8-character short id from the message header").option("--channel <channel>", "channel containing the parent message (used for disambiguation)").option("--reply-to <id>", "trigger message full/short id").action(async (opts) => {
-  const content = (await readStdin()).trim();
-  if (!content) { console.error("Error: empty content"); console.error("Next action: pipe body via heredoc on stdin"); process.exit(1); }
+thread.command("reply").description("start or reply to a thread under a message (UTF-8 stdin or --body-file)").requiredOption("--parent <msgId>", "parent message id or the 8-character short id from the message header").option("--channel <channel>", "channel containing the parent message (used for disambiguation)").option("--reply-to <id>", "trigger message full/short id").option("--body-file <path>", "read body directly from a UTF-8 file instead of stdin").action(async (opts) => {
+  const content = (await readBody(opts.bodyFile)).trim();
+  if (!content) { console.error("Error: empty content"); console.error("Next action: provide UTF-8 stdin or --body-file"); process.exit(1); }
   const d = await api("POST", "/agent-api/thread/reply", { parent: opts.parent, channel: opts.channel, content, replyTo: opts.replyTo });
   console.log(`Replied in thread (thread ${String(d.threadChannelId).slice(0, 8)}, msg ${String(d.id).slice(0, 8)})`);
 });
@@ -271,12 +267,12 @@ reminder.command("snooze").description("postpone a reminder").requiredOption("--
 
 // action prepare: B-mode quick-commit. Agents lack channel:create/agent:create scope; to create a channel/agent they post a "proposal card" that a human clicks to execute under their own identity. Action JSON is read from stdin.
 const action = program.command("action").description("prepare human-in-the-loop action cards (human commit)");
-action.command("prepare").description("prepare an action card (action JSON from stdin; variants: channel:create / agent:create)")
-  .requiredOption("--target <ch>", "#channel / dm:@name").action(async (opts) => {
-    const raw = (await readStdin()).trim();
-    if (!raw) { console.error("Error: action JSON required on stdin"); console.error('Next action: echo \'{"type":"channel:create","name":"x","description":"…"}\' | open-tag action prepare --target "#general"'); process.exit(1); }
+action.command("prepare").description("prepare an action card (UTF-8 JSON from stdin or --body-file; variants: channel:create / agent:create)")
+  .requiredOption("--target <ch>", "#channel / dm:@name").option("--body-file <path>", "read action JSON from a UTF-8 file instead of stdin").action(async (opts) => {
+    const raw = (await readBody(opts.bodyFile)).trim();
+    if (!raw) { console.error("Error: action JSON required via UTF-8 stdin or --body-file"); console.error('Next action: open-tag action prepare --target "#general" --body-file action.json'); process.exit(1); }
     let actionObj: unknown;
-    try { actionObj = JSON.parse(raw); } catch { console.error("Error: invalid JSON on stdin"); process.exit(1); }
+    try { actionObj = JSON.parse(raw); } catch { console.error("Error: invalid action JSON"); process.exit(1); }
     const d = await api("POST", "/agent-api/action/prepare", { target: opts.target, action: actionObj });
     console.log(`Prepared ${d.action?.type} card -> ${opts.target} (msg ${String(d.id).slice(0, 8)}). A human can click it to commit.`);
   });

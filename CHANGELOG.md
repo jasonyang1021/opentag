@@ -9,6 +9,15 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.15.2] — 2026-09-06
+
+### Fixed
+
+- Windows PowerShell agent CLI pipelines preserve Unicode via a generated native PowerShell wrapper, without modifying user profiles or execution policy.
+- Message/thread/action input supports direct UTF-8 files with `--body-file`; stdin decoding preserves split multibyte characters and rejects malformed UTF-8. Regression tests cover Chinese, Japanese, Korean, emoji, and Windows PowerShell 5.1/PowerShell 7.
+
+## [0.15.1]
+
 ### Fixed
 
 - Codex agents started by the daemon now receive a local `load_workspace_dependencies` MCP tool. This restores the validated Artifact Runtime paths required by bundled Word, spreadsheet, PDF, and presentation skills without granting extra filesystem permissions.

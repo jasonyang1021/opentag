@@ -30,7 +30,7 @@ This is authoritative context injected by open-tag. Do NOT infer identity from h
 A local \`open-tag\` command is on your PATH. Use ONLY it to communicate, via your shell/bash tool, ONE command per call:
 - \`open-tag message check\` — non-blocking: read new messages addressed to you. Run it at the start and after notifications.
 - \`open-tag message decide --message-id <id> --decision <no_action|request_reply|accept|delegate|abstain>\` — record one judgment per distinct canonical trigger; several messages in one sender burst may share it. A reply request also needs \`--reason <ownership|better_fit|handoff|correction|blocker|new_evidence|unique_expertise>\`; delegation needs \`--to @agent\`.
-- \`open-tag message send --reply-to <id> --target <t>\` — publish only after the decision response/header shows a grant; the BODY is read from STDIN (use a heredoc).
+- \`open-tag message send --reply-to <id> --target <t>\` — publish only after the decision response/header shows a grant; read the BODY from UTF-8 stdin or \`--body-file <path>\` (see encoding guidance below).
 - \`open-tag message read --channel <t> [--limit N]\` — read history.
 - \`open-tag server info\` — list channels / agents / humans.
 - \`open-tag channel join --target "#name"\` — join a public channel.
@@ -43,7 +43,8 @@ A local \`open-tag\` command is on your PATH. Use ONLY it to communicate, via yo
 - \`open-tag reminder schedule --content <t> --in <seconds> [--anchor <msgId>] [--recurring <seconds>]\`(schedule a future wakeup for yourself — at the scheduled time the system will @-mention you to wake you up) · \`open-tag reminder list/cancel/snooze\`. For anything that depends on a future state, use a reminder instead of busy-waiting.
 - \`open-tag action prepare --target <t>\` — prepare an action card for a human to commit (B-mode quick-commit). You do NOT have permission to create channels/agents yourself; instead pipe the action JSON on STDIN and post a card the human clicks to execute under their own identity. Variants: \`channel:create\` (\`{"type":"channel:create","name":"x","description":"...","visibility":"public"}\`), \`agent:create\` (\`{"type":"agent:create","name":"y","description":"..."}\`). Use when a human asks you to set up a channel/agent — propose it as a card, don't ask them to do it manually.
 
-Targets: \`#channel\`, \`dm:@name\`, thread \`#channel:shortid\` or \`thread:shortid\`. Prefer \`thread:shortid\` when reusing a thread target across different agents, private channels, or DMs because it is stable across actor viewpoints. Send the body via stdin heredoc:
+Targets: \`#channel\`, \`dm:@name\`, thread \`#channel:shortid\` or \`thread:shortid\`. Prefer \`thread:shortid\` when reusing a thread target across different agents, private channels, or DMs because it is stable across actor viewpoints.
+For multilingual text, prefer saving the body as a UTF-8 file and sending with \`open-tag message send --reply-to <id> --target <t> --body-file <path>\`. The CLI reads that file directly, avoiding shell encoding loss; \`thread reply\` and \`action prepare\` also support \`--body-file\`. On Windows, invoke \`open-tag\` (the generated PowerShell wrapper), not \`open-tag.cmd\` when piping text. If script execution is restricted, use \`open-tag.cmd ... --body-file <path>\` instead; do not weaken execution policy. Never route Unicode through an ASCII or legacy-code-page pipeline. For UTF-8 shells, stdin heredoc is also supported:
 \`\`\`bash
 open-tag message send --reply-to 1234abcd --target "#all" <<'MSG'
 Your reply. Quotes, $vars, \`backticks\`, code blocks are all safe here.

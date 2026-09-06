@@ -5,6 +5,7 @@
 > The authoritative route/API surface is `ARCHITECTURE.md` §II — do not treat this list as an API reference.
 
 ## P0 Foundation
+- [x] Unicode-safe agent CLI input: PowerShell UTF-8 wrapper, strict chunk-safe decoding, and UTF-8 `--body-file` for replies/action JSON (Chinese, Japanese, Korean, emoji).
 - [x] Project bootstrap + root `AGENTS.md` map (`CLAUDE.md` imports it; architecture detail lives in `ARCHITECTURE.md`)
 - [x] Docker Compose: Postgres + Redis (`docker-compose.yml`, ports 5433/6380)
 - [x] Database schema (`src/db/schema.ts`: 21 Drizzle tables; human-readable contract in `docs/generated/db-schema.md`)
