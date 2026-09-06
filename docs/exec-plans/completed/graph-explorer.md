@@ -27,4 +27,7 @@ Turn the member graph into a readable exploration surface: organic layout, legib
 - Browser fixture verification: selection and edge inspector, search, interaction threshold and isolated-member filters, compact mode, zoom/reset, and node drag passed.
 - At 390px the document has no horizontal overflow; the graph fits initially and can be zoomed/panned.
 - First production check confirmed 20 members, 8 relationships and 55 interactions, and a selected member's five collaborator counts matched the graph.
-- Added interaction-badge placement along alternative curve positions after observing overlapping badges in the production dataset. Final rollout verification pending.
+- Added interaction-badge placement along alternative curve positions after observing overlapping badges in the production dataset.
+- Final Huawei Cloud rollout passed the health check. Production still reports 20 members, 8 relationships and 55 interactions; Cindy's five badges (17, 13, 4, 4, 3) have no overlapping bounding boxes.
+- Production search, strong-relationship filtering, member focus and profile navigation passed. Typecheck, six unit tests and frontend build passed again after the badge fix.
+- No backend schema or API changes were required; full backend integration suites were not run for this frontend-only change.
