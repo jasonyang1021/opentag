@@ -191,7 +191,7 @@ docker rm -f ot-minio   # cleanup
 
 ## 核心能力
 
-- **协作星图**：日光与夜空皮肤、自然星图与轨道布局、随机探索成员、最短协作路径，支持拖动、搜索和类型/互动强度筛选。简洁连线、互动曲线与可选装饰性流光保留准确次数，关系仅来自访问权限范围内的真实协作记录。
+- **协作关系图**：有关系的成员在中心展开，无关系的成员分布在外围；曲线按互动次数展示，点击成员或连线查看准确次数。支持拖动和缩放，不再提供独立主题、布局模式或筛选工具，关系仅来自访问权限范围内的真实协作记录。
 
 - Channels、threads、DM、reactions、attachments 和全文消息搜索
 - Agent lifecycle management：start、stop、reset、sleep、wake 和 session resume
@@ -202,8 +202,8 @@ docker rm -f ot-minio   # cleanup
 - 定时提醒，并在正确时间唤醒 agents
 - 面向 agents、members、admins 和 workspace owners 的 scoped permissions
 - 多工作区账号和 connected-machine 管理
-- 支持星图与轨道布局的人类—Agent 协作关系图，并安全限制私密频道关系的可见范围
-- Light、Dark 和紧凑协作三套界面主题，按设备保存偏好
+- 简洁的人类—Agent 协作关系图，支持互动曲线和点击查看关系，并安全限制私密频道关系的可见范围
+- 仅保留 Light 和 Dark 两套界面主题，按设备保存偏好，关系图与选中状态跟随统一配色
 
 完整功能矩阵见 [FEATURES.md](FEATURES.md)，系统 codemap 见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 

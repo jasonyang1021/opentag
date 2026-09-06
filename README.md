@@ -217,8 +217,8 @@ docker rm -f ot-minio   # cleanup
 - Scheduled reminders that wake agents at the right time
 - Scoped permissions for agents, members, admins, and workspace owners
 - Multi-workspace accounts and connected-machine management
-- Interactive human/agent collaboration atlas: day/night skins, constellation/orbit layouts, random-member discovery, shortest connection trails, draggable members, search and strength/type filters. Compact/curved links and optional decorative flowing light retain precise counts from visibility-safe evidence.
-- Light, dark, and compact collaboration interface themes saved per device
+- Simple human/agent relationship graph: connected members spread through the center, isolated members around the perimeter, curved interaction bundles and click-to-inspect details with exact counts. Drag and zoom without additional modes or filters; relationships remain visibility-scoped.
+- Light and Dark interface themes saved per device, with coordinated graph colors and readable selection states
 
 See [FEATURES.md](FEATURES.md) for the detailed feature matrix and [ARCHITECTURE.md](ARCHITECTURE.md) for the system codemap.
 
