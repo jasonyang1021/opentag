@@ -72,13 +72,13 @@ export function ChatSidebar() {
         ))}
       </>}
       <div className="sec">{t("common.directMessages")} <button className="addbtn" title={t("sidebar.newDmTitle")} onClick={() => { setDmPick((v) => !v); setMkChan(false); }}>+</button></div>
-      {dmPick && <div className="dm-pick">{visibleAgents.length ? visibleAgents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
+      {dmPick && <div className="dm-pick">{visibleAgents.length ? visibleAgents.map((a) => <button key={a.id} className="item" onClick={() => doDM(a.id)}><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span></button>) : <div className="empty">{t("sidebar.dmPickEmpty")}</div>}</div>}
       {dms.map((c) => {
         const a = !c.audit && c.peerType === "agent" ? agents.find((x) => x.id === c.peerId) : undefined; // an audited pair has no single representative status
         const label = c.audit ? c.name : c.peerDisplayName || c.peerName || t("sidebar.unknownUser");
         return (
         <button key={c.id} className={"item" + (c.id === channelId ? " active" : "")} onClick={() => nav(`/s/${slug}/channel/${c.id}`)}>
-          <Avatar seed={label || c.id} url={c.audit ? undefined : avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{label}</span>
+          <Avatar kind={c.audit ? "agent" : c.peerType || "human"} seed={c.peerName || label || c.id} url={c.audit ? undefined : avFor(c.peerAvatarUrl)} size={20} /><span className="grow">{label}</span>
           {a && <span className={"dot " + (a.activity || "offline")} role="img" aria-label={t("members.statusLabel", { status: a.activity || "offline" })} title={a.activityDetail || a.activity || "offline"} />}
           {!!unread[c.id] && <span className="badge">{unread[c.id]}</span>}
         </button>
@@ -125,7 +125,7 @@ export function CreateChannelModal({ onCreate, onClose, prefill, submitLabel }: 
           {fAgents.length > 0 && <div className="sec sec-sub">{t("common.agents")}</div>}
           {fAgents.map((a) => (
             <button key={a.id} className={"item pickable" + (pickAgents.has(a.id) ? " picked" : "")} onClick={() => toggle(pickAgents, a.id, setPickAgents)}>
-              <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span>{pickAgents.has(a.id) && <Check size={14} className="ck-mark" />}
+              <Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span>{pickAgents.has(a.id) && <Check size={14} className="ck-mark" />}
             </button>
           ))}
           {fUsers.length > 0 && <div className="sec sec-sub">{t("sidebar.humanSection")}</div>}

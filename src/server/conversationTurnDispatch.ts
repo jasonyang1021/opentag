@@ -21,6 +21,7 @@ import { ensureReplyRecipients, releaseUnavailableReplyGrant, reserveReplyRecipi
 import { agentHasScope } from "./scopes.js";
 import { inputSenderAllowed } from "./agentInputPolicy.js";
 import { attributedInputSenderType } from "./agentInputView.js";
+import { isHumanOnlyAddressedMessage } from "./conversationTurnPolicy.js";
 
 type PersistedMessage = typeof schema.messages.$inferSelect;
 type PersistedChannel = typeof schema.channels.$inferSelect;
@@ -74,6 +75,7 @@ export async function prepareConversationTurnResponsibility(
   mentions: DispatchMember[],
 ): Promise<void> {
   if (!channel) return;
+  if (isHumanOnlyAddressedMessage(turn.senderType, channel.type, mentions)) return;
   const agentMembers = members.filter((member) => member.type === "agent" && member.id !== turn.senderId);
   let recipients: ReplyRecipient[] = [];
   if (channel.type === "dm") {
@@ -286,8 +288,10 @@ export async function dispatchConversationTurn<TTarget extends { ok: true }>(
     }
     const members = await deps.channelMembers(claimed.channelId);
     const mentionedOrder: string[] = [];
+    const resolvedMentions: DispatchMember[] = [];
     for (const message of turnMessages) {
       for (const mention of deps.parseMentions(message.content, members)) {
+        resolvedMentions.push(mention);
         if (mention.type === "agent" && !mentionedOrder.includes(mention.id)) mentionedOrder.push(mention.id);
       }
     }
@@ -295,6 +299,10 @@ export async function dispatchConversationTurn<TTarget extends { ok: true }>(
     const agentMembers = members.filter((member) => member.type === "agent" && member.id !== claimed.senderId);
     const byId = new Map(agentMembers.map((member) => [member.id, member]));
     const isDm = channel.type === "dm";
+    if (isHumanOnlyAddressedMessage(claimed.senderType, channel.type, resolvedMentions)) {
+      await finishConversationTurnDispatch(claimed.id, attempt, null, "completed");
+      return;
+    }
     const isTask = turnMessages.some((message) => !!message.taskStatus);
     const targetName = isDm ? `dm:@${latest.senderName}` : `#${channel.name}`;
 

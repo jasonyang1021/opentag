@@ -136,7 +136,7 @@ function ActionCardMsg({ m, readOnly = false }: { m: Msg; readOnly?: boolean }) 
     : <>{t("chat.createAgent", { name: a.name })}</>;
   return (
     <div className="msg action-card-msg" id={"m-" + m.id} key={m.id}>
-      <Avatar seed={avatarSeedFor(agents.find((a) => a.id === m.senderId), m.senderName)} url={resolveAvatar(agents.find((a) => a.id === m.senderId)?.avatarUrl, attachmentUrl)} size={36} />
+      <Avatar kind="agent" seed={avatarSeedFor(agents.find((a) => a.id === m.senderId), m.senderName)} url={resolveAvatar(agents.find((a) => a.id === m.senderId)?.avatarUrl, attachmentUrl)} size={36} />
       <div className="msg-col">
         <div className="msg-head"><span className="who">{m.senderName}</span><span className="member-badge">{t("chat.proposed")}</span><span className="ts">{fmtDateTime(m.createdAt)}</span></div>
         <div className="action-card">
@@ -537,8 +537,8 @@ export function Chat() {
                     {dateDivider}
                     <div className={"agent-run" + (isAgentReplyPreview ? " is-live agent-run-enter" : " is-receipt")} id={"m-" + m.id}>
                       {ag
-                        ? <button className="agent-run-av" onClick={() => setProfile({ type: "agent", id: m.senderId! })} title={m.senderName}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={28} /></button>
-                        : <span className="agent-run-av"><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={28} /></span>}
+                        ? <button className="agent-run-av" onClick={() => setProfile({ type: "agent", id: m.senderId! })} title={m.senderName}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={28} /></button>
+                        : <span className="agent-run-av"><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={28} /></span>}
                       <div className="agent-run-col">
                         <div className="agent-run-head">
                           <span className="who">{m.senderName}</span>
@@ -565,10 +565,10 @@ export function Chat() {
                   {ag
                     ? <span className="msg-av clickable" onClick={() => setProfile({ type: "agent", id: m.senderId! })}
                         onMouseEnter={(e) => setHoverAgent({ id: m.senderId!, x: e.currentTarget.getBoundingClientRect().right + 8, y: e.currentTarget.getBoundingClientRect().top })}
-                        onMouseLeave={() => setHoverAgent(null)}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} />{agLive !== "offline" && <span className={"av-status " + agLive} />}</span>
+                        onMouseLeave={() => setHoverAgent(null)}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} />{agLive !== "offline" && <span className={"av-status " + agLive} />}</span>
                     : m.senderId
-                      ? <span className="msg-av clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} /></span>
-                      : <span className="msg-av"><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} /></span>}
+                      ? <span className="msg-av clickable" onClick={() => setProfile({ type: "human", id: m.senderId! })}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} /></span>
+                      : <span className="msg-av"><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={36} /></span>}
                   <div className="msg-col">
                     <div className="msg-head">
                       {ag
@@ -665,7 +665,7 @@ export function Chat() {
         const live = (a.activity && a.activity !== "offline" ? a.activity : a.status) || "offline";
         return (
           <div className="agent-hovercard" style={{ left: Math.min(hoverAgent.x, window.innerWidth - 260), top: Math.min(hoverAgent.y, window.innerHeight - 120) }}>
-            <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={40} />
+            <Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={40} />
             <div className="ahc-body">
               <div className="ahc-name">{a.displayName || a.name} <span className={"dot " + live} /></div>
               <div className="ahc-handle">@{a.name}</div>
@@ -791,8 +791,8 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
         {dateDivider}
         <div className={"agent-run thread-agent-run" + (isAgentReplyPreview ? " is-live agent-run-enter" : " is-receipt")}>
           {ag
-            ? <button className="agent-run-av" onClick={() => onOpenProfile("agent", m.senderId!)} title={m.senderName}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={26} /></button>
-            : <span className="agent-run-av"><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={26} /></span>}
+            ? <button className="agent-run-av" onClick={() => onOpenProfile("agent", m.senderId!)} title={m.senderName}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={26} /></button>
+            : <span className="agent-run-av"><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={26} /></span>}
           <div className="agent-run-col">
             <div className="agent-run-head"><span className="who">{m.senderName}</span><span className="ts">{fmtDateTime(m.createdAt)}</span><MessageActivityState items={m.agentActivity} state={m.agentActivityState} /></div>
             {isAgentReplyPreview
@@ -806,9 +806,9 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
     <Fragment key={renderKeyForMessage(m)}>
       {dateDivider}
       <div className="msg">
-      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} />{live !== "offline" && <span className={"av-status " + live} />}</span>
-        : m.senderId ? <span className="msg-av clickable" onClick={() => onOpenProfile("human", m.senderId!)}><Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} /></span>
-        : <Avatar seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} />}
+      {ag ? <span className="msg-av clickable" onClick={() => onOpenProfile("agent", m.senderId!)}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} />{live !== "offline" && <span className={"av-status " + live} />}</span>
+        : m.senderId ? <span className="msg-av clickable" onClick={() => onOpenProfile("human", m.senderId!)}><Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} /></span>
+        : <Avatar kind={m.senderType} seed={senderAvatarSeed(m)} url={senderAvatar(m)} size={32} />}
       {/* content column reuses .msg-col (flex:1;min-width:0) like the main chat — without it a flex child defaults to min-width:auto and a long unbreakable token blows the message past this narrow thread panel */}
       <div className="msg-col">
         <div className="msg-head">{ag ? <span className="who clickable" onClick={() => onOpenProfile("agent", m.senderId!)}>{m.senderName}</span>
@@ -869,7 +869,7 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
         <h3># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
         <div className="sec">{t("common.agents")} <span className="cnt">{data.agents.length}</span></div>
         {data.agents.map((a) => (
-          <div key={a.id} className="item"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} />{capabilities.manageChannels && <button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button>}</div>
+          <div key={a.id} className="item"><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} />{capabilities.manageChannels && <button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button>}</div>
         ))}
         <div className="sec">{t("common.humans")} <span className="cnt">{data.humans.length}</span></div>
         {data.humans.map((u) => (
@@ -878,7 +878,7 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
         {capabilities.manageChannels && addable.length > 0 && <>
           <div className="sec sec-sub">{t("chat.addAgent")}</div>
           {addable.map((a) => (
-            <div key={a.id} className="item ghost"><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>
+            <div key={a.id} className="item ghost"><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>
           ))}
         </>}
         <div className="acts"><button className="cancel" onClick={onClose}>{t("chat.close")}</button></div>

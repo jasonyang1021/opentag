@@ -9,6 +9,7 @@
 
 | # | Symptom | Evidence | Action | Status |
 |---|---|---|---|---|
+| I105 | New-member onboarding live verification pending | `workspaceOnboarding.ts` and `onboardingPolicy.ts` have typecheck/build and policy/static coverage; no local Postgres/Redis/daemon stack or required browser tooling | Run the isolated concurrency, offline-reply, language and permission checks in `docs/member-onboarding.md` before deployment | ⬜ Pending |
 | I3 | `/api/messages/sync?since=` (seq incremental) endpoint exists but **web does not use it** — steady state uses socket.io full message:new + initial `GET /messages/channel/:id` | `web/src/store.tsx` | Clarify sync endpoint role (offline catch-up only?) and align in docs; evaluate before horizontal scale | ⬜ Pending |
 | I5 | Architecture invariants (file ≤1000 lines, cross-plane import direction, boundary parse-don't-validate) **are only prose, not mechanically enforced** | No corresponding lint/CI | Add custom lint + structural tests, errors include fix instructions | ⬜ Pending |
 | I6 | Single-instance socket.io emits directly; horizontal scale requires `@socket.io/redis-adapter` | `realtime.ts` has TODO comment | Add redis-adapter before scaling | ⬜ Pending (not blocking) |

@@ -1,4 +1,5 @@
-// Unified avatar: DiceBear notionists style, seed → deterministic unique avatar with a circular light background.
+// Unified avatar: colorful local animals (humans) and robots (agents). Uploaded images and
+// explicitly selected legacy DiceBear avatars retain their original appearance.
 // An avatarUrl may be a real image (uploaded attachment) OR a generated-avatar scheme `dicebear:<seed>`
 // (also accepts the legacy `pixel:random:<seed>` alias) — the latter renders a notionists avatar from <seed>,
 // which is how the "avatar set" picker persists a chosen generated face without uploading a file.
@@ -7,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { createAvatar } from "@dicebear/core";
 import { notionists } from "@dicebear/collection";
 import { Camera, X, Shuffle, Upload } from "lucide-react";
+import { colorAvatarUri, generatedChoice } from "./lib/colorAvatars.ts";
 
 const cache = new Map<string, string>();
 function uriFor(seed: string): string {
@@ -30,10 +32,11 @@ export function resolveAvatar(avatarUrl: string | null | undefined, signAttachme
   return avatarUrl; // dicebear:<seed> / pixel:random:<seed> — Avatar generates from the seed
 }
 
-export function Avatar({ seed, size = 24, url }: { seed: string; size?: number; url?: string | null }) {
+export function Avatar({ seed, size = 24, url, kind = "human" }: { seed: string; size?: number; url?: string | null; kind?: string }) {
   const gen = genSeed(url);
-  const isImg = !!url && !gen;
-  const uri = useMemo(() => uriFor(gen || seed), [gen, seed]);
+  const choice = generatedChoice(url);
+  const isImg = !!url && gen === null && !choice;
+  const uri = useMemo(() => gen !== null ? uriFor(gen || seed) : colorAvatarUri(choice?.seed || seed, choice?.kind || (kind === "agent" ? "robot" : "animal")), [gen, seed, kind, choice?.seed, choice?.kind]);
   return <img className="av-img" src={isImg ? url! : uri} width={size} height={size} alt={seed} title={seed} />;
 }
 
@@ -46,22 +49,22 @@ function seedBatch(base: string, n = 18): string[] {
 }
 
 // Editable avatar = the change-avatar control. Click opens a picker offering (a) a set of generated avatars to
-// switch to and (b) upload-your-own. onPickSeed persists a chosen generated face (avatarUrl=dicebear:<seed>);
+// switch to and (b) upload-your-own. onPickSeed persists a versioned tagora:v1:<kind>:<seed> choice;
 // onPickFile uploads a custom image. When editable is false it renders a plain Avatar (view-only).
-export function AvatarPicker({ name, size = 48, url, editable, busy, onPickSeed, onPickFile }: {
-  name: string; size?: number; url?: string | null; editable?: boolean; busy?: boolean;
+export function AvatarPicker({ name, size = 48, url, kind = "human", editable, busy, onPickSeed, onPickFile }: {
+  name: string; size?: number; url?: string | null; kind?: string; editable?: boolean; busy?: boolean;
   onPickSeed?: (seed: string) => void; onPickFile?: (f: File) => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [batch, setBatch] = useState<string[]>(() => seedBatch(name));
   const fileRef = useRef<HTMLInputElement>(null);
-  if (!editable) return <Avatar seed={name} size={size} url={url} />;
+  if (!editable) return <Avatar kind={kind} seed={name} size={size} url={url} />;
   return (
     <>
       <button type="button" className="av-editable" style={{ width: size, height: size }} title={t("avatar.change")}
         disabled={busy} onClick={() => { setBatch(seedBatch(name)); setOpen(true); }}>
-        <Avatar seed={name} size={size} url={url} />
+        <Avatar kind={kind} seed={name} size={size} url={url} />
         <span className="av-editable-ovl">{busy ? "…" : <Camera size={Math.round(size * 0.32)} />}</span>
       </button>
       {open && (
@@ -74,8 +77,8 @@ export function AvatarPicker({ name, size = 48, url, editable, busy, onPickSeed,
             <div className="av-picker-grid">
               {batch.map((s) => (
                 <button key={s} type="button" className="av-picker-opt" title={t("avatar.useThis")}
-                  onClick={() => { onPickSeed?.("dicebear:" + s); setOpen(false); }}>
-                  <Avatar seed={s} size={56} />
+                  onClick={() => { onPickSeed?.(`tagora:v1:${kind === "agent" ? "robot" : "animal"}:` + s); setOpen(false); }}>
+                  <Avatar kind={kind} seed={s} size={56} />
                 </button>
               ))}
             </div>

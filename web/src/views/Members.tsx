@@ -64,7 +64,7 @@ export function Members() {
             <div className="machine"><IconMonitor size={13} /> {k === "_none" ? t("members.unassigned") : mName(k)}</div>
             {byMachine[k].map((a) => (
               <button key={a.id} className={"item" + (a.id === agentId ? " active" : "")} onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.name}</span><span className={"dot " + statusOf(a)} role="img" aria-label={t("members.statusLabel", { status: statusOf(a) })} title={statusOf(a)} />
+                <Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={20} /><span className="grow">{a.name}</span><span className={"dot " + statusOf(a)} role="img" aria-label={t("members.statusLabel", { status: statusOf(a) })} title={statusOf(a)} />
               </button>
             ))}
           </div>
@@ -142,7 +142,7 @@ function Roster({ agents, humans, onCreate, canCreate }: { agents: any[]; humans
               const to = `/s/${slug}/agent/${a.id}`;
               return (
                 <div className="card card-link" key={a.id} role="button" tabIndex={0} onClick={() => nav(to)} onKeyDown={(e) => goKey(e, to)}>
-                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar seed={a.name} url={avFor(a.avatarUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
+                  <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={24} />{a.displayName || a.name} <small className="meta">@{a.name}</small></h3>
                   <div className="meta">{a.description || t("members.generalAgent")}</div>
                   <div className="kv"><b>{t("common.runtime")}</b> {a.runtime} · {a.model || t("members.useLocalDefault")}</div>
                   <div className="kv"><b>{t("common.status")}</b> {statusOf(a)}</div>
@@ -260,12 +260,12 @@ export function AgentProfile({ id, onDeleted, onClose, onMessage }: { id: string
     <>
       {onClose ? ( // panel mode (embedded in chat right sidebar: click avatar → profile panel)
         <div className="profile-panel-head">
-          <Avatar seed={a.name} url={signedAvatar} size={28} />
+          <Avatar kind="agent" seed={a.name} url={signedAvatar} size={28} />
           <div className="pph-id"><span className="pph-name">{a.displayName || a.name} <span className={"dot " + live} /></span><span className="pph-handle">@{a.name}</span></div>
           <button className="joinbtn pph-close" title={t("members.close")} onClick={onClose}><X size={14} /></button>
           {acts}
         </div>
-      ) : <div className="head head-agent"><AvatarPicker name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
+      ) : <div className="head head-agent"><AvatarPicker kind="agent" name={a.name} url={signedAvatar} size={48} editable={!!capabilities.manageAgents} busy={avBusy} onPickSeed={onPickSeed} onPickFile={onPickAvatar} /><div className="head-id"><h1>{a.displayName || a.name}</h1><small>@{a.name} <span className={"dot " + live} />{avErr ? <span className="form-err" style={{ marginLeft: 8 }}>{avErr}</span> : null}</small></div>{acts}</div>}
       <div className="ptabs">
         {/* Tab order follows AgentDetailPanel spec: integrations (not apps) */}
         {([
@@ -894,7 +894,7 @@ export function HumanProfile({ uid, onClose, onMessage }: { uid: string; onClose
             <h3>{t("members.createdAgents")} <small className="meta">· {p.createdAgents.length}</small></h3>
             {p.createdAgents.map((a: any) => (
               <button key={a.id} className="item" onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                <Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + a.status} role="img" aria-label={t("members.statusLabel", { status: a.status })} title={a.status} />
+                <Avatar kind="agent" seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + a.status} role="img" aria-label={t("members.statusLabel", { status: a.status })} title={a.status} />
               </button>
             ))}
           </div>

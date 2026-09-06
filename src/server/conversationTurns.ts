@@ -47,6 +47,7 @@ export interface AttachMessageToTurnInput {
   boundaryKind: ConversationBoundaryKind;
   replyToMessageId?: string | null;
   mergeDirect?: boolean;
+  settleImmediately?: boolean; // human-only addresses must not absorb later ambient requests
   now?: Date;
 }
 
@@ -134,7 +135,7 @@ export async function attachMessageToConversationTurn(input: AttachMessageToTurn
           lastSeq: input.seq,
           boundaryKind: input.boundaryKind,
           state: "collecting",
-          dispatchAfter: boundedConversationTurnDeadline(now, now, dispatchDelay(input.boundaryKind), TURN_MAX_WAIT_MS),
+          dispatchAfter: boundedConversationTurnDeadline(now, now, input.settleImmediately ? 0 : dispatchDelay(input.boundaryKind), TURN_MAX_WAIT_MS),
           causalRootId,
           causalDepth,
           createdAt: now,

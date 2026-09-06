@@ -467,12 +467,15 @@ export async function createMessage(opts: {
       mentions.map((x) => ({ messageId: msg!.id, mentionType: x.type, mentionId: x.id, mentionName: x.name })),
     );
   }
-  const agentMentioned = mentions.some((m) => m.type === "agent");
+  // Human-only mentions must not merge with neighboring ambient work.
+  const addressed = mentions.length > 0;
+  const humanOnlyAddressed = opts.senderType === "user" && ch?.type !== "dm"
+    && addressed && mentions.every(member => member.type === "user");
   const boundaryKind: ConversationBoundaryKind = opts.asTask
     ? "task"
     : opts.messageType === "action"
       ? "action"
-      : ch?.type === "dm" || agentMentioned
+      : ch?.type === "dm" || addressed
         ? "direct"
         : "ambient";
   const attachedTurn = opts.senderId && (opts.senderType === "user" || opts.senderType === "agent")
@@ -487,6 +490,7 @@ export async function createMessage(opts: {
       boundaryKind,
       replyToMessageId: opts.replyToMessageId,
       mergeDirect: ch?.type === "dm",
+      settleImmediately: humanOnlyAddressed,
     })
     : null;
   if (attachedTurn && !attachedTurn.merged) {

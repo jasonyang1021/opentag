@@ -263,7 +263,7 @@ export function Computers() {
               <div className="sec">{t("misc.computersAgentsSection")} <span className="cnt">{onMachine.length}</span></div>
               {onMachine.length ? onMachine.map((a) => (
                 <button key={a.id} className="item" onClick={() => nav(`/s/${slug}/agent/${a.id}`)}>
-                  <Avatar seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className="meta">{a.runtime}</span><span className={"dot " + (a.activity || a.status)} />
+                  <Avatar kind="agent" seed={a.name} url={resolveAvatar(a.avatarUrl, attachmentUrl)} size={20} /><span className="grow">{a.displayName || a.name}</span><span className="meta">{a.runtime}</span><span className={"dot " + (a.activity || a.status)} />
                 </button>
               )) : <div className="empty">{t("misc.computersNoAgent")}</div>}
             </div>
@@ -439,16 +439,26 @@ function AccountSettings({ api }: { api: any }) {
   );
 }
 function ServerSettings({ api, serverId }: { api: any; serverId: string }) {
-  const { serverAvatar, uploadServerAvatar } = useStore();
+  const { serverAvatar, uploadServerAvatar, agents } = useStore();
   const { t } = useTranslation();
   const [s, setS] = useState<any>(null);
   const [saved, setSaved] = useState(false);
   const [avErr, setAvErr] = useState("");
   const [avBusy, setAvBusy] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { (async () => setS(await api("GET", "/api/servers/" + serverId)))(); }, [serverId]);
   if (!s) return <div className="empty">{t("misc.serverLoading")}</div>;
-  const save = async () => { await api("PATCH", "/api/servers/" + serverId, { name: s.name, slug: s.slug }); setSaved(true); setTimeout(() => setSaved(false), 1500); };
+  const save = async () => {
+    setSaveError(""); setSaving(true); setSaved(false);
+    try {
+      const result = await api("PATCH", "/api/servers/" + serverId, { name: s.name, slug: s.slug, onboardingAgentId: s.onboardingAgentId || null });
+      if (result?.error) throw new Error(result.error);
+      setSaved(true); setTimeout(() => setSaved(false), 1500);
+    } catch (error: any) { setSaveError(String(error?.message || error)); }
+    finally { setSaving(false); }
+  };
   const onPick = async (e: any) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; setAvErr(""); setAvBusy(true); try { await uploadServerAvatar(f); } catch (err: any) { setAvErr(String(err?.message || err)); } finally { setAvBusy(false); } };
   return (
     <div className="setform">
@@ -462,7 +472,14 @@ function ServerSettings({ api, serverId }: { api: any; serverId: string }) {
       <label>{t("misc.serverNameLabel")}</label><input value={s.name || ""} onChange={(e) => setS({ ...s, name: e.target.value })} />
       <label>{t("misc.serverSlugLabel")}</label><input value={s.slug || ""} onChange={(e) => setS({ ...s, slug: e.target.value })} />
       <label>{t("misc.serverPlanLabel")}</label><input value={s.plan || "free"} disabled />
-      <div className="setrow"><button className="ok" onClick={save}>{t("misc.serverSave")}</button>{saved && <span className="saved">{t("misc.serverSaved")}</span>}</div>
+      <label htmlFor="onboarding-agent">{t("misc.onboardingAgentLabel")}</label>
+      <select id="onboarding-agent" value={s.onboardingAgentId || ""} disabled={s.role !== "owner" && s.role !== "admin"} onChange={(e) => setS({ ...s, onboardingAgentId: e.target.value || null })}>
+        <option value="">{t("misc.onboardingAgentOff")}</option>
+        {agents.filter((agent) => agent.creatorType !== "system").map((agent) => <option key={agent.id} value={agent.id}>{agent.displayName || agent.name}</option>)}
+      </select>
+      <p className="toggle-sub">{t("misc.onboardingAgentHelp")}</p>
+      {saveError && <div className="form-err" role="alert">{saveError}</div>}
+      <div className="setrow"><button className="ok" disabled={saving || (s.role !== "owner" && s.role !== "admin")} onClick={save}>{t("misc.serverSave")}</button>{saved && <span className="saved">{t("misc.serverSaved")}</span>}</div>
     </div>
   );
 }

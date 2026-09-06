@@ -10,6 +10,7 @@ import { DYNAMIC_RUNTIMES, getDynamicModels } from "../runtimeModels.js";
 import { PROJECT_BROWSER_CAPABILITY, requestDaemonByMachine } from "../daemonHub.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { createRequire } from "node:module";
+import { canWelcome } from "../onboardingPolicy.js";
 
 // Single source of truth for the newest published daemon version (packages/daemon/package.json). The web client
 // compares each machine's reported daemonVersion against this to raise an "outdated daemon" system alert. Falls
@@ -112,10 +113,20 @@ export async function handleServersUserScope(ctx: UserCtx): Promise<boolean> {
       const b = await readJson(req); const patch: Record<string, unknown> = {};
       if (b.name !== undefined) patch.name = b.name;
       if (b.slug !== undefined) patch.slug = String(b.slug).trim().toLowerCase().replace(/\s+/g, "-");
+      if (b.onboardingAgentId !== undefined) {
+        if (b.onboardingAgentId !== null) {
+          if (!isUuid(b.onboardingAgentId)) return (sendErr(res, 400, "invalid onboarding agent"), true);
+          const [agent] = await db.select().from(schema.agents).where(and(
+            eq(schema.agents.id, b.onboardingAgentId), eq(schema.agents.serverId, srv[1]!), isNull(schema.agents.deletedAt),
+          ));
+          if (!agent || agent.creatorType === "system" || !canWelcome(agent.scopes)) return (sendErr(res, 400, "onboarding agent must be a live workspace agent with inbox:receive, message:read and message:send"), true);
+        }
+        patch.onboardingAgentId = b.onboardingAgentId;
+      }
       if (Object.keys(patch).length) await db.update(schema.servers).set(patch).where(eq(schema.servers.id, srv[1]!));
     }
     const s = (await db.select().from(schema.servers).where(eq(schema.servers.id, srv[1]!)))[0];
-    return (s ? sendJson(res, 200, { id: s.id, name: s.name, slug: s.slug, plan: s.plan, role: mem.role, createdAt: s.createdAt }) : sendErr(res, 404, "not found"), true);
+    return (s ? sendJson(res, 200, { id: s.id, name: s.name, slug: s.slug, plan: s.plan, role: mem.role, onboardingAgentId: s.onboardingAgentId, createdAt: s.createdAt }) : sendErr(res, 404, "not found"), true);
   }
   return false;
 }

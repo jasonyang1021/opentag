@@ -124,7 +124,7 @@ export function CollaborationGraph() {
     if (selected && !graph.nodes.some((node) => memberNodeKey(node) === selected)) setSelected(null);
     if (selectedEdge && !graph.edges.some((item) => pairKey(item.sourceKey, item.targetKey) === selectedEdge)) setSelectedEdge(null);
   }, [graph, selected, selectedEdge]);
-  const avatar = (node: MemberGraphNode, px = 38) => <Avatar seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={px} />;
+  const avatar = (node: MemberGraphNode, px = 38) => <Avatar kind={node.type} seed={node.name} url={resolveAvatar(node.avatarUrl, attachmentUrl)} size={px} />;
 
   return <div className={`gx${expanded ? " gx-expanded" : ""}`} onKeyDown={(event) => {
     if (event.key === "Escape") { clearFocus(); setExpanded(false); }

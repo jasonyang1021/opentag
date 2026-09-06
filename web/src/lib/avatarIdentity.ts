@@ -7,8 +7,8 @@ export interface NamedAvatarIdentity {
 
 /** One fallback seed for every rendering of the same member when no avatarUrl is stored. */
 export function avatarSeedFor(identity: NamedAvatarIdentity | null | undefined, fallback = "?"): string {
-  return identity?.displayName?.trim()
-    || identity?.name?.trim()
+  return identity?.name?.trim()
+    || identity?.displayName?.trim()
     || identity?.id
     || identity?.userId
     || fallback;

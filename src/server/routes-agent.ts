@@ -17,6 +17,7 @@ import { isConversationTurnCapabilityPaused } from "./conversationTurnRecovery.j
 import { CHANNEL_DELETED_NOTICE_KIND, channelDeletedNoticeForAgent, type ChannelDeletedNoticeMetadata } from "./channelDeletionNotice.js";
 import { inputSenderAllowed } from "./agentInputPolicy.js";
 import { agentInputVisible, filterAgentInputView } from "./agentInputView.js";
+import { memberOnboardingContext } from "./workspaceOnboarding.js";
 
 // Freshness-hold draft buffer (prevents agent↔agent duplicate replies): when the agent sends
 // and new messages have arrived since last read → save as draft + surface bounded context, do not post immediately.
@@ -340,7 +341,9 @@ export async function handleAgentApi(req: IncomingMessage, res: ServerResponse, 
         const atts = await db.select().from(schema.attachments).where(inArray(schema.attachments.messageId, fresh.map((m) => m.id)));
         const byMsg = new Map<string, { filename: string; id: string }[]>();
         for (const a of atts) { const k = a.messageId!; const arr = byMsg.get(k) ?? []; arr.push({ filename: a.filename, id: a.id }); byMsg.set(k, arr); }
-        out.push(...fresh.map((m) => ({ ...serialize(m), coordination: coordination.get(m.id) ?? null, text: fmt(m, target, byMsg.get(m.id) ?? [], coordination.get(m.id)) })));
+        const onboarding = ch.type === "dm" && agentHasScope(agent.scopes, "message:read")
+          ? await memberOnboardingContext(serverId, ch.id, agent.id) : "";
+        out.push(...fresh.map((m) => ({ ...serialize(m), coordination: coordination.get(m.id) ?? null, text: [fmt(m, target, byMsg.get(m.id) ?? [], coordination.get(m.id)), onboarding].filter(Boolean).join("\n\n") })));
       }
       // Persisted observation de-duplicates stable messages beyond a collecting gap. The scalar channel
       // cursor advances only through the contiguous prefix, so the hidden Turn cannot be skipped forever.

@@ -1,9 +1,12 @@
 // Auto-extracted from the former routes-api.ts monolith — bodies are verbatim.
 import type { BaseCtx, UserCtx } from "./ctx.js";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { devLoginEnabled, hashPassword, isValidEmail, passwordError, safeEqual, setupToken, signUser, verifyPassword } from "../auth.js";
-import { DESC_TOO_LONG, createServer, descTooLong } from "../core.js";
+import { DESC_TOO_LONG, createServer, descTooLong, serializeMsg } from "../core.js";
+import { seedMemberWelcome } from "../workspaceOnboarding.js";
+import { publish } from "../realtime.js";
+import { createLogger } from "../../log.js";
 import { REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, clientIp, rateLimit } from "../ratelimit.js";
 import { readJson, sendErr, sendJson } from "../util.js";
 
@@ -110,14 +113,26 @@ export async function handleAuthedAuth(ctx: UserCtx): Promise<boolean> {
     if (link.maxUses != null && link.useCount >= link.maxUses) return (sendErr(res, 410, "invite exhausted"), true);
     const srv = (await db.select().from(schema.servers).where(eq(schema.servers.id, link.serverId)))[0];
     if (!srv) return (sendErr(res, 404, "server gone"), true);
-    const existing = (await db.select().from(schema.serverMembers).where(and(eq(schema.serverMembers.serverId, link.serverId), eq(schema.serverMembers.userId, userId))))[0];
-    if (!existing) {
-      await db.insert(schema.serverMembers).values({ serverId: link.serverId, userId, role: link.role });
-      await db.update(schema.joinLinks).set({ useCount: link.useCount + 1 }).where(eq(schema.joinLinks.id, link.id));
-      const all = (await db.select().from(schema.channels).where(and(eq(schema.channels.serverId, link.serverId), eq(schema.channels.name, "all"))))[0];
-      if (all) await db.insert(schema.channelMembers).values({ channelId: all.id, memberType: "user", memberId: userId }).onConflictDoNothing();
+    const result = await db.transaction(async (tx) => {
+      const [locked] = await tx.select().from(schema.joinLinks).where(eq(schema.joinLinks.id, link.id)).for("update");
+      if (!locked) return { error: "invalid invite" };
+      if (locked.expiresAt && locked.expiresAt.getTime() < Date.now()) return { error: "invite expired" };
+      if (locked.maxUses != null && locked.useCount >= locked.maxUses) return { error: "invite exhausted" };
+      const [joined] = await tx.insert(schema.serverMembers).values({ serverId: link.serverId, userId, role: locked.role }).onConflictDoNothing().returning();
+      if (!joined) return { already: true, welcome: null };
+      await tx.update(schema.joinLinks).set({ useCount: sql`${schema.joinLinks.useCount} + 1` }).where(eq(schema.joinLinks.id, link.id));
+      const [all] = await tx.select().from(schema.channels).where(and(eq(schema.channels.serverId, link.serverId), eq(schema.channels.name, "all")));
+      if (all) await tx.insert(schema.channelMembers).values({ channelId: all.id, memberType: "user", memberId: userId }).onConflictDoNothing();
+      return { already: false, welcome: await seedMemberWelcome(tx, link.serverId, userId) };
+    });
+    if (result.error) return (sendErr(res, 410, result.error), true);
+    if (result.welcome) {
+      const message = result.welcome;
+      // A realtime failure must not turn a committed join into a failure. Bootstrap/reconnect reads the durable DM.
+      try { await publish(link.serverId, { type: "message", channelId: message.channelId, message: { ...serializeMsg(message, []), channelType: "dm" } }); }
+      catch (error) { createLogger("server:onboarding").warn("welcome realtime delivery failed", { error: String(error) }); }
     }
-    return (sendJson(res, 200, { serverSlug: srv.slug, serverId: srv.id, already: !!existing }), true);
+    return (sendJson(res, 200, { serverSlug: srv.slug, serverId: srv.id, already: result.already }), true);
   }
 
   if (p === "/api/auth/me" && method === "GET") {

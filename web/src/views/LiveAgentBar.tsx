@@ -60,7 +60,7 @@ export function LiveAgentBar() {
         title={t("liveBar.viewActivity", { name: primary.displayName || primary.name })}
       >
         <span className="live-bar__ava">
-          <Avatar seed={primary.name} url={avFor(primary.avatarUrl)} size={22} />
+          <Avatar kind="agent" seed={primary.name} url={avFor(primary.avatarUrl)} size={22} />
           <span className={"live-bar__pip dot " + primary.activity} aria-hidden="true" />
         </span>
         <span className="live-bar__text">
@@ -89,7 +89,7 @@ export function LiveAgentBar() {
             {live.map((a) => (
               <div key={a.id} className="live-bar__pop-row">
                 <button type="button" className="live-bar__pop-item" onClick={() => goActivity(a.id)}>
-                  <Avatar seed={a.name} url={avFor(a.avatarUrl)} size={20} />
+                  <Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={20} />
                   <span className="live-bar__pop-text">
                     <span className="live-bar__pop-name">{a.displayName || a.name}</span>
                     <span className="live-bar__pop-detail">{labelOf(a)}</span>

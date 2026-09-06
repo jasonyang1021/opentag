@@ -74,7 +74,7 @@ function ShowcaseMsg({ line, task, attachment, replyCount, onOpenThread }: {
   const { role, title } = isYou ? { role: "", title: "" } : roleOf(senderName);
   return (
     <div className="msg">
-      <Avatar seed={senderName} size={36} />
+      <Avatar kind={isYou ? "human" : "agent"} seed={senderName} size={36} />
       <div className="msg-col">
         <div className="msg-head">
           <span className="who" title={title || undefined}>{displayName}</span>

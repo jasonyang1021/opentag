@@ -2,6 +2,13 @@ export const DEFAULT_CONVERSATION_TURN_WINDOW_MS = 1_200;
 export const DEFAULT_CONVERSATION_TURN_MAX_WAIT_MS = 5_000;
 export const MAX_CONVERSATION_TURN_WINDOW_MS = 30_000;
 
+/** Human-addressed channel messages are not ambient requests for an agent. */
+export function isHumanOnlyAddressedMessage(senderType: string, channelType: string, mentions: readonly { type: string }[]): boolean {
+  return senderType === "user" && channelType !== "dm"
+    && mentions.some(member => member.type === "user")
+    && !mentions.some(member => member.type === "agent");
+}
+
 /** Malformed configuration cannot disable or indefinitely delay Turn dispatch. */
 export function parseConversationTurnWindowMs(raw: string | undefined, fallbackMs = DEFAULT_CONVERSATION_TURN_WINDOW_MS): number {
   const fallback = Math.min(Math.max(Math.trunc(fallbackMs), 0), MAX_CONVERSATION_TURN_WINDOW_MS);

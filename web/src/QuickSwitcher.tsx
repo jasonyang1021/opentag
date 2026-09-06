@@ -2,15 +2,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "./store.tsx";
-import { Avatar } from "./Avatar.tsx";
+import { Avatar, resolveAvatar } from "./Avatar.tsx";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-interface QSItem { kind: "channel" | "dm" | "agent" | "human"; id: string; label: string; sub: string; go: () => void }
+interface QSItem { kind: "channel" | "dm" | "agent" | "human"; id: string; label: string; sub: string; seed?: string | null; avatarUrl?: string | null; avatarKind?: string | null; go: () => void }
 
 export function QuickSwitcher({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { channels, dms, visibleAgents: agents, humans, slug } = useStore(); // visibleAgents: keep showcase demo props out of the quick switcher
+  const { channels, dms, visibleAgents: agents, humans, slug, attachmentUrl } = useStore(); // visibleAgents: keep showcase demo props out of the quick switcher
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [hi, setHi] = useState(0);
@@ -21,9 +21,9 @@ export function QuickSwitcher({ onClose }: { onClose: () => void }) {
   const ql = q.toLowerCase().trim();
   const all: QSItem[] = [
     ...channels.filter((c) => c.type !== "dm").map((c): QSItem => ({ kind: "channel", id: c.id, label: c.name, sub: t("qs.subChannel"), go: () => nav(`/s/${slug}/channel/${c.id}`) })),
-    ...dms.map((d): QSItem => ({ kind: "dm", id: d.id, label: d.peerDisplayName || d.peerName || t("qs.unknownUser"), sub: t("qs.subDm"), go: () => nav(`/s/${slug}/channel/${d.id}`) })),
-    ...agents.map((a): QSItem => ({ kind: "agent", id: a.id, label: a.displayName || a.name, sub: t("qs.subAgent"), go: () => nav(`/s/${slug}/agent/${a.id}`) })),
-    ...humans.map((h): QSItem => ({ kind: "human", id: h.userId, label: h.displayName || h.name, sub: t("qs.subMember"), go: () => nav(`/s/${slug}/human/${h.userId}`) })),
+    ...dms.map((d): QSItem => ({ kind: "dm", id: d.id, seed: d.peerName, avatarKind: d.peerType, avatarUrl: d.peerAvatarUrl, label: d.peerDisplayName || d.peerName || t("qs.unknownUser"), sub: t("qs.subDm"), go: () => nav(`/s/${slug}/channel/${d.id}`) })),
+    ...agents.map((a): QSItem => ({ kind: "agent", id: a.id, seed: a.name, avatarUrl: a.avatarUrl, label: a.displayName || a.name, sub: t("qs.subAgent"), go: () => nav(`/s/${slug}/agent/${a.id}`) })),
+    ...humans.map((h): QSItem => ({ kind: "human", id: h.userId, seed: h.name, avatarUrl: h.avatarUrl, label: h.displayName || h.name, sub: t("qs.subMember"), go: () => nav(`/s/${slug}/human/${h.userId}`) })),
   ];
   const items = (ql ? all.filter((it) => it.label.toLowerCase().includes(ql)) : all).slice(0, 40);
 
@@ -51,7 +51,7 @@ export function QuickSwitcher({ onClose }: { onClose: () => void }) {
           {items.length === 0 ? <div className="qs-empty">{t("qs.noMatch")}</div> :
             items.map((it, i) => (
               <button key={it.kind + it.id} className={"qs-item" + (i === hi ? " on" : "")} onMouseEnter={() => setHi(i)} onClick={() => pick(it)}>
-                {it.kind === "channel" ? <span className="qs-hash">#</span> : <Avatar seed={it.label} size={20} />}
+                {it.kind === "channel" ? <span className="qs-hash">#</span> : <Avatar kind={it.avatarKind || it.kind} seed={it.seed || it.label} url={resolveAvatar(it.avatarUrl, attachmentUrl)} size={20} />}
                 <span className="qs-label">{it.label}</span>
                 <span className="qs-kind">{it.sub}</span>
               </button>

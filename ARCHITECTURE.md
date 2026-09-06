@@ -6,6 +6,28 @@
 
 ## I. Overview
 
+`web/src/lib/colorAvatars.ts` renders deterministic local SVG animal/robot defaults.
+`Avatar.tsx` accepts member kind and persists picker choices as `tagora:v1:animal:<seed>`
+or `tagora:v1:robot:<seed>`. Real uploaded URLs and legacy DiceBear choices are retained.
+`avatarIdentity.ts` prefers stable handles over editable display names across member surfaces.
+
+`workspaceOnboarding.ts` seeds one platform-authored private welcome on behalf of the
+configured `servers.onboardingAgentId` in the invite-acceptance transaction, without
+waking a runtime. `onboardingPolicy.ts` defines the welcome and language-first guidance.
+`PATCH /api/servers/:id` configures this through `manageServer`, validates a live,
+non-showcase same-workspace agent with receive/read/send scopes, and accepts null to disable.
+Server Settings exposes the selector; enabling never backfills existing members.
+Agent `message/check` appends onboarding context only in the original two-member DM,
+including its first human reply as quoted language-preference context. The existing CLI
+target header stays first. Normal DM reply admission and action-card admin gates apply.
+See `docs/member-onboarding.md` for persistence and verification boundaries.
+
+Human-authored channel/thread messages with resolved human mentions but no agent mentions
+do not reserve or dispatch an automatic agent owner (`conversationTurnPolicy.ts`).
+They form immediately settled Turn boundaries to avoid absorbing nearby ambient requests.
+Plain messages retain automatic ownership; explicit agent mentions and DMs retain existing
+routing. This changes wake behavior, not message visibility.
+
 Channel deep links may address internal thread channels absent from the sidebar. `GET /api/channels/:id/detail`
 returns whitelisted channel metadata after tenant-scoped `canUserReadChannel`, including the inherited `audit`
 read-only flag. `web/src/lib/channelNavigation.ts` selects only the explicit URL target (no `#all` fallback)

@@ -154,7 +154,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           {cands.map((c, i) => (
             <button key={c.kind + c.id} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel} disabled={sending}
               onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
-              <Avatar seed={c.name} url={avFor(c.avatarUrl)} size={22} />
+              <Avatar kind={c.kind} seed={c.name} url={avFor(c.avatarUrl)} size={22} />
               <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
               <span className="mk">{c.kind === "agent" ? t("chat.agentKind") : t("chat.memberKind")}</span>
             </button>
