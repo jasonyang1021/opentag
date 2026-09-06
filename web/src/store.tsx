@@ -349,7 +349,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setChannels((cs) => cs.map((c) => (c.id === msg.channelId ? { ...c, lastMessageAt: msg.createdAt } : c)));
           setDms((ds) => ds.map((d) => (d.id === msg.channelId ? { ...d, lastMessageAt: msg.createdAt } : d)));
         }
-        dispatch({ type: "message", channelId: msg.channelId, message: msg }); // normalize to internal event bus shape; views stay unchanged
+        dispatch({ type: "message", channelId: msg.channelId, message: msg, live: true }); // Catch-up messages intentionally lack live, so they cannot replay desktop alerts.
       });
       sock.on("agent:activity", (p: any) => {
         if (p?.entries) {
@@ -374,7 +374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "machine", ...p });
       });
       sock.on("task:created", (p: any) => (p.tasks || []).forEach((t: any) => dispatch({ type: "task", op: "created", task: t }))); // payload={channelId,tasks:[]}
-      sock.on("task:updated", (p: any) => dispatch({ type: "task", op: "updated", task: p.task }));                                  // payload={channelId,task}
+      sock.on("task:updated", (p: any) => dispatch({ type: "task", op: "updated", task: p.task, statusChange: p.statusChange }));
       sock.on("task:deleted", (p: any) => dispatch({ type: "task", op: "deleted", taskId: p.taskId, channelId: p.channelId }));      // payload={channelId,taskId}
       sock.on("message:updated", (m: any) => dispatch({ type: "message:updated", message: m }));
       sock.on("thread:updated", (p: any) => {

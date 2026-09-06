@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { daemonUpdateCommandTemplate, isDaemonUpdateAvailable } from "../machineUi.ts";
 import { copyText } from "../lib/clipboard.ts";
 import { useToast } from "../toast.tsx";
+import { NotificationSettings } from "../NotificationSettings.tsx";
 import { getTheme, saveTheme, THEMES, type Theme } from "../theme.ts";
 
 export function Tasks() {
@@ -377,7 +378,7 @@ export function Settings() {
       <main className="content-col">
         <div className="head"><h1>{t("misc.settingsTitle", { section: curLabel })}</h1></div>
         <div className="scroll">
-          {cur === "account" ? <AccountSettings api={api} /> : cur === "appearance" ? <AppearanceSettings /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationsSettings api={api} serverId={serverId} /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
+          {cur === "account" ? <AccountSettings api={api} /> : cur === "appearance" ? <AppearanceSettings /> : cur === "server" ? <ServerSettings api={api} serverId={serverId} /> : cur === "invites" ? <InvitesSettings api={api} serverId={serverId} /> : cur === "notifications" ? <NotificationSettings key={serverId} /> : <div className="empty">{t("misc.settingsWip", { section: cur })}</div>}
         </div>
       </main>
     </>
@@ -483,32 +484,6 @@ function ServerSettings({ api, serverId }: { api: any; serverId: string }) {
     </div>
   );
 }
-// Notification settings (GET/PATCH /api/servers/:id/notification-settings): per-user mute toggle for this workspace.
-function NotificationsSettings({ api, serverId }: { api: any; serverId: string }) {
-  const { t } = useTranslation();
-  const [muted, setMuted] = useState<boolean | null>(null);
-  const [saved, setSaved] = useState(false);
-  useEffect(() => { if (!serverId) return; (async () => { const r = await api("GET", `/api/servers/${serverId}/notification-settings`); setMuted(!!r?.serverPushMuted); })(); }, [serverId]);
-  if (muted === null) return <div className="empty">{t("misc.notifLoading")}</div>;
-  const toggle = async () => {
-    const next = !muted; setMuted(next);
-    await api("PATCH", `/api/servers/${serverId}/notification-settings`, { serverPushMuted: next });
-    setSaved(true); setTimeout(() => setSaved(false), 1500);
-  };
-  return (
-    <div className="setform">
-      <div className="toggle-row">
-        <div className="toggle-text">
-          <div className="toggle-title">{t("misc.notifMuteTitle")}</div>
-          <div className="toggle-sub">{t("misc.notifMuteDesc")}</div>
-        </div>
-        <button role="switch" aria-checked={muted} className={"switch" + (muted ? " on" : "")} onClick={toggle}><span className="knob" /></button>
-      </div>
-      {saved && <div className="setrow"><span className="saved">{t("misc.notifSaved")}</span></div>}
-    </div>
-  );
-}
-
 // Saved messages view (/s/:server/saved): bookmark list with source channel/thread, sender, relative time, content, and unsave action; clicking a card navigates to the message.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const relTime = (iso?: string, tFn?: (k: string, opts?: any) => string) => {

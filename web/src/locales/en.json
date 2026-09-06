@@ -1,4 +1,16 @@
 {
+  "taskTools": { "channel": "Channel", "creator": "Creator", "assignee": "Assignee", "filters": "Filters", "clear": "Clear", "search": "Search…", "layout": "Board layout" },
+  "fileLibrary": { "hint": "Latest 100 attachments from this channel and its task threads. Send an attachment to add it here.", "refresh": "Refresh", "error": "Could not load files. Please refresh to retry." },
+  "desktopNotifications": {
+    "title": "Browser notifications", "description": "Notify me about mentions, direct messages, and my tasks reaching review or completion. Message contents stay private.",
+    "enable": "Enable", "disable": "Disable", "test": "Send test notification", "testBody": "Browser notifications are working.",
+    "testSent": "Test requested. If nothing appears, check your browser's system notification settings and Do Not Disturb.",
+    "granted": "Browser permission granted.", "denied": "Blocked by your browser. Allow notifications in this site's permissions, then return here.",
+    "default": "Click Enable to request browser permission.", "unsupported": "This browser does not support desktop notifications.", "insecure": "Open this site over HTTPS to enable notifications.",
+    "scope": "For this account and workspace on this browser only. Keep the page open; closed-page push and mobile notifications are not included. The conversation you are actively viewing stays quiet.",
+    "error": "Could not complete this action. Check browser support, permissions and your connection, then retry.",
+    "mention": "Someone mentioned you. Click to view the message.", "dm": "You have a new direct message. Click to view it.", "in_review": "Your task is ready for review. Click to view it.", "done": "Your task is complete. Click to view it."
+  },
   "graphExplorer": {
     "subtitle": "Who works with whom. Select a member or a curve to see the details.",
     "human": "Humans",

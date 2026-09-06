@@ -12,10 +12,12 @@ import { selectPosition } from "./selectPosition";
 
 export interface Opt { value: string; label: string; hint?: string }
 
-export function Select({ value, options, onChange, placeholder, ariaLabel }: { value: string; options: Opt[]; onChange: (v: string) => void; placeholder?: string; ariaLabel?: string }) {
+export function Select({ value, options, onChange, placeholder, ariaLabel, searchable = false, buttonLabel }: { value: string; options: Opt[]; onChange: (v: string) => void; placeholder?: string; ariaLabel?: string; searchable?: boolean; buttonLabel?: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0); // keyboard-highlighted option index
+  const [query, setQuery] = useState("");
+  const visibleOptions = options.filter((o) => !searchable || o.label.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const [pos, setPos] = useState<React.CSSProperties | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -23,11 +25,12 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
 
   const place = () => {
     const r = btnRef.current?.getBoundingClientRect(); if (!r) return;
-    setPos({ ...selectPosition(r, window.innerWidth, window.innerHeight), boxSizing: "border-box", overscrollBehavior: "contain" });
+    setPos({ ...selectPosition({ left: r.left, top: r.top, bottom: r.bottom, width: searchable || buttonLabel ? Math.max(240, r.width) : r.width }, window.innerWidth, window.innerHeight), boxSizing: "border-box", overscrollBehavior: "contain" });
   };
   useLayoutEffect(() => { if (open) place(); }, [open]);
   useEffect(() => {
     if (!open) return;
+    setQuery("");
     setHi(Math.max(0, options.findIndex((o) => o.value === value)));
     const onDown = (e: MouseEvent) => { const t = e.target as Node; if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false); };
     const close = () => setOpen(false);
@@ -43,7 +46,7 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
   }, [open, options, value]);
   useEffect(() => {
     if (!open) return;
-    const menu = menuRef.current, item = menu?.children[hi] as HTMLElement | undefined;
+    const menu = menuRef.current, item = menu?.querySelectorAll<HTMLElement>('[role="option"]')[hi];
     if (!menu || !item) return;
     if (item.offsetTop < menu.scrollTop) menu.scrollTop = item.offsetTop;
     else if (item.offsetTop + item.offsetHeight > menu.scrollTop + menu.clientHeight)
@@ -53,24 +56,27 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
   const pick = (v: string) => { onChange(v); setOpen(false); btnRef.current?.focus(); };
   const onKey = (e: React.KeyboardEvent) => {
     if (!open) { if (e.key === "Enter" || e.key === "ArrowDown" || e.key === " ") { e.preventDefault(); setOpen(true); } return; }
-    if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
-    else if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(options.length - 1, h + 1)); }
+    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btnRef.current?.focus(); }
+    else if (e.key === "Tab") { setOpen(false); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(visibleOptions.length - 1, h + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
-    else if (e.key === "Home") { e.preventDefault(); setHi(0); }
-    else if (e.key === "End") { e.preventDefault(); setHi(Math.max(0, options.length - 1)); }
-    else if (e.key === "Enter") { e.preventDefault(); options[hi] && pick(options[hi]!.value); }
+    else if (e.key === "Home" && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); setHi(0); }
+    else if (e.key === "End" && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); setHi(Math.max(0, visibleOptions.length - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); visibleOptions[hi] && pick(visibleOptions[hi]!.value); }
   };
 
   return (
     <div className="sel">
       <button ref={btnRef} type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open}
         className={"sel-trigger" + (open ? " open" : "")} onClick={() => setOpen((o) => !o)} onKeyDown={onKey}>
-        <span className="grow">{cur?.label ?? <span className="sel-ph">{placeholder ?? t("select.placeholder")}</span>}</span>
+        <span className="grow">{buttonLabel ?? cur?.label ?? <span className="sel-ph">{placeholder ?? t("select.placeholder")}</span>}</span>
         <svg className="sel-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && pos && createPortal(
-        <div ref={menuRef} className="sel-menu" role="listbox" style={pos} onKeyDown={onKey} tabIndex={-1}>
-          {options.length === 0 ? <div className="sel-empty">{t("select.empty")}</div> : options.map((o, i) => (
+        <div ref={menuRef} className="sel-menu" style={pos} onKeyDown={onKey} tabIndex={-1}>
+          {searchable && <input className="sel-search" autoFocus aria-label={t("taskTools.search")} placeholder={t("taskTools.search")} value={query} onChange={(e) => { setQuery(e.target.value); setHi(0); }} />}
+          <div role="listbox" aria-label={ariaLabel}>
+          {visibleOptions.length === 0 ? <div className="sel-empty">{t("select.empty")}</div> : visibleOptions.map((o, i) => (
             <button key={o.value} type="button" role="option" aria-selected={o.value === value}
               className={"sel-opt" + (o.value === value ? " on" : "") + (i === hi ? " hi" : "")}
               onMouseEnter={() => setHi(i)} onMouseDown={(e) => { e.preventDefault(); pick(o.value); }}>
@@ -78,6 +84,7 @@ export function Select({ value, options, onChange, placeholder, ariaLabel }: { v
               {o.value === value && <Check size={14} className="sel-check" />}
             </button>
           ))}
+          </div>
         </div>,
         document.body,
       )}

@@ -8,6 +8,7 @@ import { Menu, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSystemAlerts, NotificationCenter } from "./alerts.tsx";
 import { resizedPanelWidth } from "./panelResize.ts";
+import { useDesktopNotifications } from "./desktopNotifications";
 
 const SECTIONS = [
   { key: "search", Icon: IconSearch, labelKey: "nav.search" },
@@ -21,6 +22,7 @@ const SECTIONS = [
 export interface LayoutOutletContext { setChatPanelOpen: Dispatch<SetStateAction<boolean>> }
 
 export function Layout() {
+  useDesktopNotifications();
   const loc = useLocation();
   const { server } = useParams();
   const nav = useNavigate();

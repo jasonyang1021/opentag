@@ -125,7 +125,7 @@ export async function emitMapped(serverId: string, event: any): Promise<void> {
       const t = event.task; // = serializeMsg(message), includes channelId
       const taskEvent: [string, unknown] = event.op === "created"
         ? ["task:created", { channelId: t.channelId, tasks: [t] }]
-        : ["task:updated", { channelId: t.channelId, task: t }];
+        : ["task:updated", { channelId: t.channelId, task: t, statusChange: event.statusChange }];
       await emitAuthorizedChannel(srv, serverId, t.channelId, [taskEvent, ["message:updated", t]]);
       break;
     }

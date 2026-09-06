@@ -62,6 +62,17 @@ Agent data plane   Agent process → HTTP /agent-api/*  (Bearer per-agent token 
 
 ## II. Codemap (what each file/directory does)
 
+Collaboration polish boundaries: `src/server/channelFiles.ts` aggregates posted root
+and readable child-thread attachments without changing ownership or download access.
+`fileDeliveryPolicy.ts` appends final-file upload/send guidance to agent `message/check`,
+after the existing target header and onboarding context. `core.ts` adds optional actor
+metadata on explicit task status changes; `socketio.ts` forwards it as `statusChange`
+on `task:updated`. `web/src/desktopNotifications.ts` consumes authorized live events,
+enforces opt-in/mute/focus/dedup, and is mounted by Layout; `NotificationSettings.tsx`
+owns permission/testing controls. Its pure policy lives in `lib/desktopNotificationPolicy.ts`.
+`Select.tsx` has opt-in searchable menus and compact trigger labels used by TaskBoard.
+Contracts and verification limits: `docs/collaboration-polish.md`.
+
 ### Control plane + data plane (`src/server/`, TypeScript — the production implementation)
 
 - `index.ts` — HTTP entry point: route order `/agent-api` → `/api` → `/docs/` (`docs-site/dist`, with `/_astro/*` asset support) → static `web/dist` (SPA fallback only for known client routes from `staticRoutes.ts`, so scanner/file paths 404 instead of getting the app shell); mounts socket.io (human real-time), bare WebSocket (daemon control plane), reminder scheduler, and the durable Conversation Turn scheduler. `/docs` redirects to `/docs/`, so self-hosted installs get in-app docs at their own origin while the marketing site points to `https://docs.getopentag.com/`.

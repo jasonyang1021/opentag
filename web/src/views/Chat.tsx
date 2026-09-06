@@ -493,7 +493,7 @@ export function Chat() {
           )}
         </div>
         {chatTab === "tasks" && cur ? <TaskBoard channelId={cur.id} onOpenThread={startThread} />
-          : chatTab === "files" && cur ? <ChannelFiles channelId={cur.id} />
+          : chatTab === "files" && cur ? <ChannelFiles key={cur.id} channelId={cur.id} />
           : <>
             {chatTab === "chat" && unreadThreads.length > 0 && (
               <button className="unread-threads-bar" onClick={() => openUnreadThread(unreadThreads[0]!)}>
@@ -825,7 +825,7 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
     );
   };
   return (
-    <aside className="thread-panel">
+    <aside className="thread-panel" data-notification-channel={channelId}>
       <div className="thread-head"><span className="grow">{t("chat.thread")}</span>
         {!readOnly && <button className="tp-link" title={t("chat.markDone")} onClick={async () => { await api("POST", "/api/channels/threads/done", { threadChannelId: channelId }); onClose(); }}><CheckCircle2 size={14} /></button>}
         {!readOnly && <button className="tp-link" title={t("chat.unfollowThread")} onClick={async () => { await api("POST", "/api/channels/threads/unfollow", { threadChannelId: channelId }); onClose(); }}><BellOff size={14} /></button>}
@@ -890,13 +890,32 @@ function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: s
 // Channel files tab (chatTab=files): lists attachments associated with channel messages; click to download or preview
 function ChannelFiles({ channelId }: { channelId: string }) {
   const { t } = useTranslation();
-  const { api, attachmentUrl, slug } = useStore();
+  const { api, attachmentUrl, slug, serverId, onEvent } = useStore();
   const nav = useNavigate();
   const [files, setFiles] = useState<any[]>([]);
-  useEffect(() => { (async () => { const d = await api("GET", `/api/channels/${channelId}/files`); setFiles(d?.files || []); })(); }, [channelId]);
+  const [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setFiles([]); setLoading(true); setError(false);
+    api("GET", `/api/channels/${channelId}/files`).then((d: any) => { if (!cancelled) setFiles(d?.files || []); })
+      .catch(() => { if (!cancelled) setError(true); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [channelId, serverId, refresh]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = onEvent((e) => {
+      if ((e.type === "message" && e.channelId === channelId && e.message?.attachments?.length) || (e.type === "thread:updated" && e.parentChannelId === channelId)) {
+        clearTimeout(timer); timer = setTimeout(() => setRefresh((n) => n + 1), 300);
+      }
+    });
+    return () => { off(); clearTimeout(timer); };
+  }, [channelId, serverId]);
   return (
     <div className="scroll ch-view-enter">
-      {files.length === 0 ? <div className="empty">{t("chat.noFiles")}</div>
+      <div className="task-toolbar"><span className="meta grow">{t("fileLibrary.hint")}</span><button disabled={loading} onClick={() => setRefresh((n) => n + 1)}>{t("fileLibrary.refresh")}</button></div>
+      {error ? <div role="alert" className="empty">{t("fileLibrary.error")}</div> : loading ? <div className="empty">{t("misc.notifLoading")}</div> : files.length === 0 ? <div className="empty">{t("chat.noFiles")}</div>
         : files.map((f) => (
           <div key={f.id} className="card file-row">
             <a className="file-main" href={attachmentUrl(f.id)} target="_blank" rel="noreferrer">

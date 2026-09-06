@@ -12,6 +12,8 @@
 
 ## Active
 
+- **Collaboration polish** — [execution plan](./exec-plans/active/collaboration-polish.md).
+
 - **Channel-scoped mentions** — implementation and verification: [execution plan](./exec-plans/active/channel-mentions.md).
 
 - **Authorization hardening** — a two-plane security audit (human `routes-api` + agent `routes-agent`)

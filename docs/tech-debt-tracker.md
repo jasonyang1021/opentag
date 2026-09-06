@@ -7,6 +7,16 @@
 
 ## Open items
 
+### I106 — Collaboration polish live acceptance pending
+
+Task-toolbar/desktop-notification policy and file-delivery guidance are implemented;
+types, unit tests and builds cover code paths but do not prove real browser or Agent
+behavior. The worktree has no isolated `.env`, local Docker is unavailable, and no
+chrome-devtools tool is configured. The guarded channel Files integration test is
+skipped without a migrated local `TEST_DATABASE_URL`. Run the acceptance checklist in
+`docs/collaboration-polish.md` before treating these features as production-verified.
+Status: pending. No production deployment was performed for this change.
+
 | # | Symptom | Evidence | Action | Status |
 |---|---|---|---|---|
 | I105 | New-member onboarding live verification pending | `workspaceOnboarding.ts` and `onboardingPolicy.ts` have typecheck/build and policy/static coverage; no local Postgres/Redis/daemon stack or required browser tooling | Run the isolated concurrency, offline-reply, language and permission checks in `docs/member-onboarding.md` before deployment | ⬜ Pending |

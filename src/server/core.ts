@@ -734,8 +734,8 @@ async function taskMentions(messageId: string): Promise<Member[]> {
   const mts = await db.select().from(schema.messageMentions).where(eq(schema.messageMentions.messageId, messageId));
   return mts.map((x) => ({ type: x.mentionType as "user" | "agent", id: x.mentionId, name: x.mentionName, displayName: x.mentionName }));
 }
-async function emitTaskUpdated(serverId: string, msg: typeof schema.messages.$inferSelect): Promise<void> {
-  await publish(serverId, { type: "task", op: "updated", task: serializeMsg(msg, await taskMentions(msg.id)) });
+async function emitTaskUpdated(serverId: string, msg: typeof schema.messages.$inferSelect, statusChange?: { actorType?: string; actorId?: string }): Promise<void> {
+  await publish(serverId, { type: "task", op: "updated", task: serializeMsg(msg, await taskMentions(msg.id)), statusChange });
 }
 
 /** Mark an existing message as a task (open + assign taskNumber). */
@@ -948,7 +948,7 @@ export async function setTaskStatus(serverId: string, messageId: string, status:
     .set({ taskStatus: status, taskCompletedAt: finished ? new Date() : null, updatedAt: new Date() })
     .where(and(eq(schema.messages.id, messageId), eq(schema.messages.serverId, serverId), isNotNull(schema.messages.taskStatus))).returning();
   if (!upd) return null;
-  await emitTaskUpdated(serverId, upd); // task message itself updated (taskStatus) → lands in CHANNEL, updates badge + board in channel (verified: message:updated and task:updated both land in the channel)
+  await emitTaskUpdated(serverId, upd, { actorType: by?.type, actorId: by?.id }); // Explicit status event, separate from claim/assignment updates.
   // "moved" system message for status change → lands in the task's THREAD, not channel (message:new channelId=task.threadId).
   const actor = by ? await actorName(by.type, by.id) : "Someone";
   // Ensure task has a thread (tasks always have a thread; create now for legacy data / not yet created) → moved system message lands in thread

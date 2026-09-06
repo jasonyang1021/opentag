@@ -9,6 +9,7 @@ import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { canonicalDmParticipantIds, canUserReadChannel, canUserWriteChannel, classifyAgentDm, isAgentDmAuditChannel } from "../channelAccess.js";
 import { deleteChannelWithAgentNotice } from "../channelDeletion.js";
 import { userChannels } from "./shared.js";
+import { listChannelFiles } from "../channelFiles.js";
 
 const notSentBy = (userId: string) => or(isNull(schema.messages.senderId), ne(schema.messages.senderId, userId));
 
@@ -416,20 +417,9 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   // Attachment upload (multipart, fields: files + channelId) → save to disk + insert attachment row (messageId is backfilled when the message is sent)
   const cfiles = /^\/api\/channels\/([^/]+)\/files$/.exec(p);
   if (cfiles && method === "GET") {
-    // invariant 3: private/DM channel file list must not be accessible to non-members (IDOR-B2)
-    if (!(await canUserReadChannel(serverId, cfiles[1]!, userId))) return (sendErr(res, 404, "channel not found"), true);
-    const rows = await db.select().from(schema.attachments).where(and(eq(schema.attachments.channelId, cfiles[1]!), eq(schema.attachments.serverId, serverId), isNotNull(schema.attachments.messageId))).orderBy(desc(schema.attachments.createdAt)).limit(100); // serverId scope: don't list another tenant's channel files by raw channel UUID
-    const aIds = rows.filter((r) => r.uploaderType === "agent" && r.uploaderId).map((r) => r.uploaderId!) as string[];
-    const uIds = rows.filter((r) => r.uploaderType === "user" && r.uploaderId).map((r) => r.uploaderId!) as string[];
-    const ags = aIds.length ? await db.select().from(schema.agents).where(inArray(schema.agents.id, aIds)) : [];
-    const usrs = uIds.length ? await db.select().from(schema.users).where(inArray(schema.users.id, uIds)) : [];
-    const who = (t: string | null, id: string | null) => (t === "agent" ? ags.find((a) => a.id === id) : usrs.find((u) => u.id === id));
-    return (sendJson(res, 200, {
-      files: rows.map((a) => {
-        const src: any = who(a.uploaderType, a.uploaderId);
-        return { id: a.id, messageId: a.messageId, channelId: a.channelId, filename: a.filename, mimeType: a.mimeType, sizeBytes: a.sizeBytes, width: null, height: null, thumbnailUrl: null, createdAt: a.createdAt, uploader: { type: a.uploaderType, id: a.uploaderId, name: src?.name ?? null, displayName: src?.displayName ?? null }, source: { type: "channel", channelId: a.channelId, parentMessageId: null } };
-      }), nextCursor: null,
-    }), true);
+    const files = await listChannelFiles(serverId, cfiles[1]!, userId);
+    if (!files) return (sendErr(res, 404, "channel not found"), true);
+    return (sendJson(res, 200, { files, nextCursor: null }), true);
   }
   if (p === "/api/channels" && method === "POST") {
     if (!await requireCap(serverId, userId, "manageChannels")) return (sendErr(res, 403, "need manageChannels capability"), true);

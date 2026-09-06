@@ -1,0 +1,7 @@
+// Server-supplied guidance reaches existing runtimes through message/check.
+// This is delivery etiquette, not an authorization grant or filesystem watcher.
+export const FILE_DELIVERY_GUIDANCE = `[File delivery]
+When fulfilling a request for a file, deliver the final requested artifact as a real message attachment, not just a local path or a claim that it was created.
+Before spending your one-shot reply grant, upload each final file with open-tag attachment upload --file <path> --channel <authorized-reply-target>. Then include the returned IDs in your final reply using open-tag message send --target <authorized-reply-target> --reply-to <trigger-id> --attach <id1,id2> (provide the reply body through stdin or --body-file).
+Use the exact reply target allowed by coordination; task results belong in the task thread. Channel Files includes those thread attachments. Upload alone is not delivery: check that message send succeeded; if held, follow the existing draft workflow without sending a duplicate reply.
+Only upload artifacts requested for this conversation. Never upload secrets, credentials, internal memory, unrelated files or temporary intermediates. Respect a request to keep files local. Do not claim delivery or move a task to review until the attachment message succeeded. If upload/send is blocked by scope, size, permissions or a missing file, report the concrete blocker through an authorized reply; never bypass permissions.`;

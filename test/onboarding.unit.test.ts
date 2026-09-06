@@ -51,5 +51,5 @@ test("invite transaction seeds only new membership; normal login has no welcome 
   assert.doesNotMatch(welcome, /await createMessage|wakeAgent|broadcastToDaemons/);
   const agentRoute = readFileSync(new URL("../src/server/routes-agent.ts", import.meta.url), "utf8");
   // CLI target extraction requires the original [target=...] header at the start.
-  assert.match(agentRoute, /text: \[fmt\(m, target, byMsg.get\(m.id\) \?\? \[\], coordination.get\(m.id\)\), onboarding\]/);
+  assert.match(agentRoute, /text: \[fmt\(m, target, byMsg.get\(m.id\) \?\? \[\], coordination.get\(m.id\)\), onboarding, FILE_DELIVERY_GUIDANCE\]/);
 });

@@ -7,6 +7,8 @@
 ## P0 Foundation
 - [x] Colorful local default avatars: six animal silhouettes for humans, friendly robots for agents, stable handle-based assignment and a shuffle picker; uploaded and explicitly selected legacy avatars are preserved.
 - [x] Configurable one-time private new-member welcome, language-first onboarding context, and unchanged admin resource-creation gates (unit-tested; live onboarding E2E pending).
+- [x] Compact searchable task filters, thread-inclusive channel Files and server-provided artifact-delivery guidance (live verification pending; see `docs/collaboration-polish.md`).
+- [x] Opt-in open-page desktop notifications for personal mentions/DMs and task review/completion; no closed-page push (live browser verification pending).
 - [x] Human-only channel/thread @mentions do not auto-wake agents; ordinary ambient ownership, mixed human/agent mentions, and DMs retain existing routing.
 - [x] Unicode-safe agent CLI input: PowerShell UTF-8 wrapper, strict chunk-safe decoding, and UTF-8 `--body-file` for replies/action JSON (Chinese, Japanese, Korean, emoji).
 - [x] Project bootstrap + root `AGENTS.md` map (`CLAUDE.md` imports it; architecture detail lives in `ARCHITECTURE.md`)

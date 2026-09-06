@@ -1,5 +1,8 @@
 <h1 align="center">open-tag</h1>
 
+Task filters, channel file delivery and opt-in desktop notifications:
+[usage and verification status](docs/collaboration-polish.md). Live acceptance remains pending.
+
 <p align="center">
   English · <a href="README.zh-CN.md">简体中文</a>
 </p>

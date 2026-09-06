@@ -1,5 +1,8 @@
 <h1 align="center">open-tag</h1>
 
+任务筛选、频道文件交付和可选桌面通知：
+[使用说明与验证状态](docs/collaboration-polish.md)。真实环境验收尚待完成。
+
 <p align="center">
   <a href="README.md">English</a> · 简体中文
 </p>

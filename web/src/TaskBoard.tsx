@@ -1,7 +1,7 @@
 // Task board shared between the channel chatTab=tasks view and the global Tasks page.
 // Five-status columns + Board/List toggle + Board layout toggle (horizontal columns ↔ vertical stack, persisted) (pure frontend) + Creator/Assignee filters (pure frontend, applied over the loaded array) + New Task (POST /api/tasks/channel/:id).
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Trash2, ChevronDown, ChevronRight, Pencil, Columns3, Rows3, ListChecks } from "lucide-react";
+import { Trash2, ChevronDown, ChevronRight, Pencil, ListChecks } from "lucide-react";
 import { createPortal } from "react-dom";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable, type DragEndEvent } from "@dnd-kit/core";
 import { useNavigate } from "react-router-dom";
@@ -56,6 +56,8 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const setLayout = (l: "columns" | "stack") => { setBoardLayout(l); try { localStorage.setItem("open-tag.tasks.boardLayout", l); } catch { /* */ } };
   const [creatorKey, setCreatorKey] = useState(""); // "" = all | "me" | "type:id"
   const [assigneeKey, setAssigneeKey] = useState(""); // "" = all | "unclaimed" | "type:id"
+  const [channelKey, setChannelKey] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [mkOpen, setMkOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null); // id of the card being dragged → turns every column into a generous drop target
   // Status-change menu, hoisted to the board (NOT inside StatusPill): the inner card/pill components are redefined
@@ -119,6 +121,7 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   }, [tasks, agents, humans]);
 
   const filtered = tasks.filter((task) => {
+    if (!channelId && channelKey && task.channelId !== channelKey) return false;
     if (creatorKey === "me" ? task.senderId !== me?.id : creatorKey && `${task.senderType}:${task.senderId}` !== creatorKey) return false;
     if (assigneeKey === "unclaimed" ? !!task.taskAssigneeId : assigneeKey && `${task.taskAssigneeType}:${task.taskAssigneeId}` !== assigneeKey) return false;
     return true;
@@ -235,24 +238,29 @@ export function TaskBoard({ channelId, onOpenThread }: { channelId: string | nul
   const activeTask = activeId ? tasks.find((x) => x.id === activeId) : null; // the card currently being dragged, rendered in the DragOverlay
 
   return (
-    <div className="scroll board-scroll">
+    <div className="scroll board-scroll task-surface">
       <div className="task-toolbar">
+        <div className={"task-filter-group" + (filtersOpen ? " expanded" : "")}>
+        <button className="task-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>{t("taskTools.filters")}{(creatorKey || assigneeKey || (!channelId && channelKey)) ? " •" : ""}</button>
+        <div className="task-filter-items">
+        {!channelId && <Select searchable ariaLabel={t("taskTools.channel")} buttonLabel={!channelKey ? t("taskTools.channel") : undefined} value={channelKey} onChange={setChannelKey}
+          options={[{ value: "", label: t("misc.tasksAll") }, ...channels.filter((c) => c.type !== "dm" && c.type !== "thread").map((c) => ({ value: c.id, label: `# ${c.name}` }))]} />}
+        <Select searchable buttonLabel={!creatorKey ? t("taskTools.creator") : undefined} ariaLabel={t("tasks.filterByCreator")} value={creatorKey} onChange={setCreatorKey}
+          options={[{ value: "", label: t("tasks.allCreators") }, ...(me ? [{ value: "me", label: t("tasks.myTasks") }] : []), ...creators.filter((c) => c.key !== `user:${me?.id}`).map((c) => ({ value: c.key, label: c.name }))]} />
+        <Select searchable buttonLabel={!assigneeKey ? t("taskTools.assignee") : undefined} ariaLabel={t("tasks.filterByAssignee")} value={assigneeKey} onChange={setAssigneeKey}
+          options={[{ value: "", label: t("tasks.allAssignees") }, { value: "unclaimed", label: t("tasks.unclaimed") }, ...assignees.map((a) => ({ value: a.key, label: a.name }))]} />
+        {(creatorKey || assigneeKey || (!channelId && channelKey)) && <button className="task-clear" onClick={() => { setCreatorKey(""); setAssigneeKey(""); setChannelKey(""); }}>{t("taskTools.clear")}</button>}
+        </div>
+        </div>
+        <div className="task-view-actions">
         <div className="seg">
           <button className={view === "board" ? "on" : ""} onClick={() => setView("board")}>{t("tasks.viewBoard")}</button>
           <button className={view === "list" ? "on" : ""} onClick={() => setView("list")}>{t("tasks.viewList")}</button>
         </div>
-        {view === "board" && (
-          <div className="seg seg-icon">
-            <button className={boardLayout === "columns" ? "on" : ""} title={t("tasks.layoutColumns")} aria-label={t("tasks.layoutColumns")} onClick={() => setLayout("columns")}><Columns3 size={15} /></button>
-            <button className={boardLayout === "stack" ? "on" : ""} title={t("tasks.layoutStack")} aria-label={t("tasks.layoutStack")} onClick={() => setLayout("stack")}><Rows3 size={15} /></button>
-          </div>
-        )}
-        <Select ariaLabel={t("tasks.filterByCreator")} value={creatorKey} onChange={setCreatorKey}
-          options={[{ value: "", label: t("tasks.allCreators") }, ...(me ? [{ value: "me", label: t("tasks.myTasks") }] : []), ...creators.filter((c) => c.key !== `user:${me?.id}`).map((c) => ({ value: c.key, label: c.name }))]} />
-        <Select ariaLabel={t("tasks.filterByAssignee")} value={assigneeKey} onChange={setAssigneeKey}
-          options={[{ value: "", label: t("tasks.allAssignees") }, { value: "unclaimed", label: t("tasks.unclaimed") }, ...assignees.map((a) => ({ value: a.key, label: a.name }))]} />
-        <span className="grow" />
+        {view === "board" && <Select ariaLabel={t("taskTools.layout")} buttonLabel="⋯" value={boardLayout} onChange={(v) => setLayout(v as "columns" | "stack")}
+          options={[{ value: "columns", label: t("tasks.layoutColumns") }, { value: "stack", label: t("tasks.layoutStack") }]} />}
         {channelId && <button className="ok newtask" onClick={() => setMkOpen(true)}>{t("tasks.newTask")}</button>}
+        </div>
       </div>
       {filtered.length === 0 ? <PaneEmpty icon={<ListChecks size={30} />} title={tasks.length ? t("tasks.emptyFiltered") : channelId ? t("tasks.emptyChannel") : t("tasks.emptyServer")} />
         : view === "board" ? (
