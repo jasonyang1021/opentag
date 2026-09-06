@@ -71,6 +71,28 @@ export function CollaborationGraph() {
   const width = Math.max(640, size.width), height = Math.max(520, size.height);
   const layout = useMemo(() => layoutMemberGraph(graph.nodes, graph.edges, width, height), [graph, width, height]);
   const positions = useMemo(() => new Map(layout.map((node) => [memberNodeKey(node), { ...node, ...manual[memberNodeKey(node)] }])), [layout, manual]);
+  const edgeLabels = useMemo(() => {
+    const labels = new Map<string, Point>();
+    for (const item of graph.edges) {
+      const a = positions.get(item.sourceKey)!, b = positions.get(item.targetKey)!;
+      const key = pairKey(item.sourceKey, item.targetKey);
+      const dx = b.x - a.x, dy = b.y - a.y, distance = Math.hypot(dx, dy) || 1;
+      const direction = [...key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2 ? 1 : -1;
+      const offsets = edgeCurveOffsets(strands ? item.weight : 1, direction, distance);
+      const offset = offsets[Math.floor(offsets.length / 2)]!;
+      const control = { x: (a.x + b.x) / 2 - dy / distance * offset, y: (a.y + b.y) / 2 + dx / distance * offset };
+      const candidates = [0.64, 0.36, 0.78, 0.22, 0.5].map((fraction) => ({
+        x: (1 - fraction) ** 2 * a.x + 2 * (1 - fraction) * fraction * control.x + fraction ** 2 * b.x,
+        y: (1 - fraction) ** 2 * a.y + 2 * (1 - fraction) * fraction * control.y + fraction ** 2 * b.y,
+      }));
+      const penalty = (point: Point) =>
+        [...labels.values()].reduce((sum, p) => sum + (Math.abs(p.x - point.x) < 42 && Math.abs(p.y - point.y) < 28 ? 10 : 0), 0) +
+        [...positions.values()].reduce((sum, p) => sum + (Math.abs(p.x - point.x) < 65 && point.y > p.y - 32 && point.y < p.y + 60 ? 5 : 0), 0);
+      candidates.sort((a, b) => penalty(a) - penalty(b));
+      labels.set(key, candidates[0]!);
+    }
+    return labels;
+  }, [graph.edges, positions, strands]);
   const selectedNode = graph.nodes.find((node) => memberNodeKey(node) === selected);
   const edge = graph.edges.find((item) => pairKey(item.sourceKey, item.targetKey) === selectedEdge);
   const focus = selectedNode ?? graph.nodes.find((node) => memberNodeKey(node) === hovered);
@@ -177,14 +199,13 @@ export function CollaborationGraph() {
               const offsets = edgeCurveOffsets(strands ? item.weight : 1, direction, distance);
               const path = (offset: number) => `M ${a.x} ${a.y} Q ${(a.x + b.x) / 2 - dy / distance * offset} ${(a.y + b.y) / 2 + dx / distance * offset} ${b.x} ${b.y}`;
               const middle = offsets[Math.floor(offsets.length / 2)]!;
-              const labelX = (a.x + b.x) / 2 - dy / distance * middle / 2;
-              const labelY = (a.y + b.y) / 2 + dx / distance * middle / 2;
+              const labelPosition = edgeLabels.get(key)!;
               const label = `${displayName(a)} ↔ ${displayName(b)} · ${t("members.graphInteractionCount", { count: item.weight })}`;
               return <g key={key} className={`gx-edge${active ? " active" : ""}${dim ? " dim" : ""}`}>
                 {offsets.map((offset, index) => <path className="gx-strand" key={index} d={path(offset)} style={!strands ? { strokeWidth: clamp(Math.log2(item.weight + 1), 1, 4) } : undefined} />)}
                 <path className="gx-edge-hit" data-edge={key} d={path(middle)} role="button" tabIndex={0} aria-label={label} onClick={() => { setSelected(null); setSelectedEdge(key); setHovered(null); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(null); setSelectedEdge(key); setHovered(null); } }}><title>{label}</title></path>
-                {active && <g className="gx-edge-count" transform={`translate(${labelX},${labelY})`}><rect x={-17} y={-11} width={34} height={22} rx={11} /><text textAnchor="middle" dy="4">{item.weight}</text></g>}
+                {active && <g className="gx-edge-count" transform={`translate(${labelPosition.x},${labelPosition.y})`}><rect x={-17} y={-11} width={34} height={22} rx={11} /><text textAnchor="middle" dy="4">{item.weight}</text></g>}
               </g>;
             })}
           </svg>

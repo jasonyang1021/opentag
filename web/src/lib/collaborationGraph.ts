@@ -89,7 +89,7 @@ export function visibleEdgeStrandCount(weight: number) {
 export function edgeCurveOffsets(weight: number, direction: 1 | -1, distance = 200) {
   const count = visibleEdgeStrandCount(weight);
   const bend = Math.max(30, Math.min(110, distance * 0.32));
-  const spread = Math.min(150, distance * 0.65);
+  const spread = Math.min(150, distance * 0.65, bend * 1.6);
   return Array.from({ length: count }, (_, index) =>
     direction * (bend + (count === 1 ? 0 : (index / (count - 1) - 0.5) * spread)));
 }

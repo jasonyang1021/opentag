@@ -26,4 +26,5 @@ Turn the member graph into a readable exploration surface: organic layout, legib
 - Six helper tests, typecheck and production frontend build passed.
 - Browser fixture verification: selection and edge inspector, search, interaction threshold and isolated-member filters, compact mode, zoom/reset, and node drag passed.
 - At 390px the document has no horizontal overflow; the graph fits initially and can be zoomed/panned.
-- Production deployment and live-data verification pending.
+- First production check confirmed 20 members, 8 relationships and 55 interactions, and a selected member's five collaborator counts matched the graph.
+- Added interaction-badge placement along alternative curve positions after observing overlapping badges in the production dataset. Final rollout verification pending.
