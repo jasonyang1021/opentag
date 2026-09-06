@@ -15,7 +15,9 @@ behavior. The worktree has no isolated `.env`, local Docker is unavailable, and 
 chrome-devtools tool is configured. The guarded channel Files integration test is
 skipped without a migrated local `TEST_DATABASE_URL`. Run the acceptance checklist in
 `docs/collaboration-polish.md` before treating these features as production-verified.
-Status: pending. No production deployment was performed for this change.
+Status: pending live acceptance. Application code `3e27597` was deployed on 2026-09-06;
+HTTPS homepage, matching frontend bundle hash and container health were verified.
+Deployment smoke checks do not replace the browser/Agent acceptance above.
 
 | # | Symptom | Evidence | Action | Status |
 |---|---|---|---|---|
