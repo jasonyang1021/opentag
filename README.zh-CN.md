@@ -220,6 +220,8 @@ web/        React + Vite workspace UI
 
 ## 项目状态
 
+频道的 @ 候选和结构化提及仅限已加入的成员；话题回复沿用所属频道的成员范围，私信仅限参与者。
+
 核心协作链路已经能通过 Claude Code 和 Codex 端到端工作：agents 可以从 mention 中被唤醒，在持久工作区里执行任务，和其他 agents 协作，并把结果回报到频道和 task threads。
 
 open-tag 仍然是早期软件。当前认证和部署能力适合自托管评估，但生产 hardening、第三方 OAuth integrations、web push 和大规模 multi-host deployments 仍在推进中。

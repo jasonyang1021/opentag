@@ -3,7 +3,7 @@ import type { ServerCtx } from "./ctx.js";
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { db, schema } from "../../db/index.js";
 import { requireCap } from "../capabilities.js";
-import { addChannelMembers, getOrCreateDM, getOrCreateThread, wakeAgentForLifecycleNotice } from "../core.js";
+import { mentionableMembers, addChannelMembers, getOrCreateDM, getOrCreateThread, wakeAgentForLifecycleNotice } from "../core.js";
 import { publish } from "../realtime.js";
 import { isUuid, readJson, sendErr, sendJson } from "../util.js";
 import { canonicalDmParticipantIds, canUserReadChannel, canUserWriteChannel, classifyAgentDm, isAgentDmAuditChannel } from "../channelAccess.js";
@@ -347,6 +347,14 @@ export async function handleChannels(ctx: ServerCtx): Promise<boolean> {
   // scopes results to channels the user can still access (never leak a private/thread they were removed from)
   // and yields lastReadSeq for the read flag.
   if (p === "/api/announcements/active" && method === "GET") return (sendJson(res, 200, { announcements: [] }), true);
+  const mentionRoster = /^\/api\/channels\/([^/]+)\/mentionable-members$/.exec(p);
+  if (mentionRoster && method === "GET") {
+    const id = mentionRoster[1]!;
+    if (!isUuid(id)) return (sendErr(res, 404, "channel not found"), true);
+    const ch = (await db.select().from(schema.channels).where(and(eq(schema.channels.id, id), eq(schema.channels.serverId, serverId), isNull(schema.channels.deletedAt))))[0];
+    if (!ch || !(await canUserReadChannel(serverId, id, userId))) return (sendErr(res, 404, "channel not found"), true);
+    return (sendJson(res, 200, { members: await mentionableMembers(serverId, ch) }), true);
+  }
   const cmem = /^\/api\/channels\/([^/]+)\/members$/.exec(p);
   if (cmem && !isUuid(cmem[1]!)) return (sendErr(res, 404, "channel not found"), true); // covers GET/POST/DELETE below — non-uuid would throw in the ownership pre-query
   if (cmem && method === "GET") {

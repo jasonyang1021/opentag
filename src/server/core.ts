@@ -135,14 +135,13 @@ export function parseMentions(content: string, members: Member[]) {
 }
 
 /** All @-addressable members of a workspace: its live agents + human server-members.
- *  Basis for Slack-style mention auto-join — only names that resolve here may be pulled into a channel
+ *  Used to exclude deleted agents and identities outside the workspace from mention rosters
  *  (a human in the users table who isn't a member of this server, or another server's agent, is excluded). */
 export async function workspaceMembers(serverId: string): Promise<Member[]> {
   const out: Member[] = [];
   // Exclude system-seeded showcase demo agents (creatorType="system"): they are display-only props for the
-  // read-only #showcase channel, NOT @-reachable members. This pool feeds @-mention auto-join in public
-  // channels — without the filter, @-ing a word that happens to match a prop's name (e.g. "Pat") would
-  // auto-join it into a real channel and fire a no-op wake (it has no machine). Message rendering resolves a
+  // read-only #showcase channel, NOT @-reachable members. This pool filters mention rosters — without the filter, a prop's name could
+  // become a mention target and fire a no-op wake (it has no machine). Message rendering resolves a
   // sender by id elsewhere, so props still render correctly in #showcase history.
   const ags = await db.select().from(schema.agents).where(and(eq(schema.agents.serverId, serverId), isNull(schema.agents.deletedAt), ne(schema.agents.creatorType, "system")));
   for (const a of ags) out.push({ type: "agent", id: a.id, name: a.name, displayName: a.displayName });
@@ -153,31 +152,27 @@ export async function workspaceMembers(serverId: string): Promise<Member[]> {
   return out;
 }
 
-/** Pure decision for Slack-style auto-join: of the workspace members @-referenced in `content`, which are
- *  not yet members of the channel (`current`) and therefore need to be added. Reuses parseMentions so the
- *  matching can never drift from how mentions are actually recorded. */
+/** Pure thread-follow decision: referenced parent-roster members not yet following.
+ * Reuses parseMentions so matching cannot drift from structured mentions. */
 export function membersToAutoJoin(content: string, workspace: Member[], current: Member[]): Member[] {
   const have = new Set(current.map((m) => m.type + ":" + m.id));
   return parseMentions(content, workspace).filter((r) => !have.has(r.type + ":" + r.id));
 }
 
-/** The member set an @-mention in this channel may pull in (auto-join) — who already has access to the space,
- *  so adding them leaks nothing. A thread inherits its PARENT channel's reach, the same parent-channel
- *  inheritance `canReadChannel` (socketio.ts) uses for read access: a public channel's thread reaches the
- *  whole workspace, a private channel's thread only its parent's members, a DM's thread only the two parties.
- *  A top-level public `channel` reaches the workspace; `private`/`dm` reach only their current members, so an
- *  @ to a non-member there stays a no-op (unchanged behaviour). */
-async function mentionAutoJoinPool(serverId: string, ch: typeof schema.channels.$inferSelect): Promise<Member[]> {
+/** Mention roster: current channel members, or the current parent roster for threads.
+ * Public visibility does not grant mention reach. Invalid/deleted parents fail closed. */
+export async function mentionableMembers(serverId: string, ch: typeof schema.channels.$inferSelect): Promise<Member[]> {
+  if (ch.serverId !== serverId || ch.deletedAt) return [];
   let target = ch;
-  if (ch.type === "thread" && ch.parentMessageId) {
-    const parent = (await db.select().from(schema.messages).where(eq(schema.messages.id, ch.parentMessageId)))[0];
-    const pch = parent ? (await db.select().from(schema.channels).where(eq(schema.channels.id, parent.channelId)))[0] : undefined;
-    if (pch) target = pch; // depth 1: a parent channel is never itself a thread
-    // Orphaned thread (parent message/channel deleted): fall back to the thread's own members — a conservative
-    // no-op for @-ing a non-member (the pre-fix behaviour), but log it so a silently-dropped @ is debuggable.
-    else log.warn("thread parent channel unresolved; @-mention reach falls back to thread members", { channelId: ch.id, parentMessageId: ch.parentMessageId });
+  if (ch.type === "thread") {
+    if (!ch.parentMessageId) return [];
+    const parent = (await db.select().from(schema.messages).where(and(eq(schema.messages.id, ch.parentMessageId), eq(schema.messages.serverId, serverId))))[0];
+    const pch = parent ? (await db.select().from(schema.channels).where(and(eq(schema.channels.id, parent.channelId), eq(schema.channels.serverId, serverId), isNull(schema.channels.deletedAt))))[0] : undefined;
+    if (!pch || pch.type === "thread") return [];
+    target = pch;
   }
-  return target.type === "channel" ? await workspaceMembers(serverId) : await channelMembers(target.id);
+  const current = new Set((await channelMembers(target.id)).map(m => m.type + ":" + m.id));
+  return (await workspaceMembers(serverId)).filter(m => current.has(m.type + ":" + m.id));
 }
 
 async function allowedMentionAutoJoinPool(
@@ -203,7 +198,7 @@ async function allowedMentionAutoJoinPool(
   return pool.filter((member) => member.type === "user" || allowedAgents.has(member.id));
 }
 
-/** Add @-mentioned non-members to a channel, drawn from `pool` (its @-reach — see mentionAutoJoinPool); returns
+/** Add @-mentioned non-members to a channel, drawn from `pool` (its @-reach — see mentionableMembers); returns
  *  those added. Idempotent via onConflictDoNothing; broadcasts a membership update so every client refreshes. */
 async function autoJoinMentioned(serverId: string, channelId: string, content: string, current: Member[], pool: Member[], watermark: number): Promise<Member[]> {
   const toAdd = membersToAutoJoin(content, pool, current);
@@ -454,22 +449,17 @@ export async function createMessage(opts: {
   }
 
   let members = await channelMembers(opts.channelId);
-  // Human-authored Slack-style mention auto-join: @-mentioning someone who isn't in this channel yet pulls them in, so the
-  // mention is recorded + delivered (wake / inbox) instead of being silently dropped. A thread inherits its
-  // parent channel's @-reach (mentionAutoJoinPool — the same parent-channel inheritance canReadChannel uses),
-  // so @-ing a teammate who hasn't replied in the thread yet still wakes them. Public channel → whole
-  // workspace; private/dm (and their threads) → existing members only, so an @ to a non-member stays a no-op.
-  // A resolvable mention is an active work edge for human and agent senders. The reach pool still preserves
-  // the channel boundary: public spaces may pull in workspace peers; private/DM spaces never pull outsiders.
-  if (ch && canAutoJoinMentionedMembers(opts.senderType) && opts.content.includes("@")) {
-    const reach = await allowedMentionAutoJoinPool(
-      opts.serverId,
-      opts.senderType,
-      opts.senderId,
-      await mentionAutoJoinPool(opts.serverId, ch),
-    );
-    const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, reach, seq - 1);
-    if (joined.length) members = [...members, ...joined];
+  // Channel mentions never invite outsiders. A parent member may still follow a thread
+  // through a mention, but stale thread membership cannot outlive the parent roster.
+  if (ch && opts.content.includes("@")) {
+    const roster = await mentionableMembers(opts.serverId, ch);
+    const keys = new Set(roster.map(m => m.type + ":" + m.id));
+    members = members.filter(m => keys.has(m.type + ":" + m.id));
+    if (ch.type === "thread" && canAutoJoinMentionedMembers(opts.senderType)) {
+      const reach = await allowedMentionAutoJoinPool(opts.serverId, opts.senderType, opts.senderId, roster);
+      const joined = await autoJoinMentioned(opts.serverId, opts.channelId, opts.content, members, reach, seq - 1);
+      members = [...members, ...joined];
+    }
   }
   const mentions = parseMentions(opts.content, members);
   if (mentions.length) {

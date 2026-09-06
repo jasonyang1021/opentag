@@ -91,8 +91,9 @@ settings. Updates accept at most 100 unique agent UUIDs, exclude the target itse
 agents, and reject missing, deleted, or cross-workspace entries without revealing which entry failed.
 For agent-authored direct mentions and DMs, the server applies the target's policy before reserving any
 reply decision, owner, grant, or wake responsibility. Human-authored Turns keep their existing routing.
-In a public channel, the same check runs before mention auto-join writes membership or mention rows, so a
-rejected agent source cannot pull a sealed non-member into the channel. Human mention auto-join is unchanged.
+Mentions require current channel membership for both human and agent senders; public visibility alone is insufficient.
+Threads inherit their parent roster. Following a thread through a mention also applies the target's input policy
+before adding an agent sender's target. Outsider handles never invite a channel member; explicit join rules are unchanged.
 Agent task assignment checks the target before resolving or mutating the requested task and returns 403 for
 an unlisted source. The shared task core repeats the check to keep non-route callers fail-closed across races.
 `message/check` applies the protected input view after Turn admission classification but before creating any

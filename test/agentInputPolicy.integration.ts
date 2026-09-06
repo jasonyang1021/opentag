@@ -221,8 +221,7 @@ async function main() {
       eq(schema.messageMentions.mentionType, "agent"),
       eq(schema.messageMentions.mentionId, target.id),
     ));
-    check("human mention still adds the target at the triggering watermark", humanMembership?.lastReadSeq === humanJoinMessage.seq - 1
-      && humanMention.length === 1);
+    check("human mention cannot invite a non-member either", !humanMembership && humanMention.length === 0);
 
     const [channel] = await db.insert(schema.channels).values({
       serverId: server.id, name: `policy-turn-${suffix}`, type: "channel",

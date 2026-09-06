@@ -5,6 +5,7 @@ import { useStore, type Agent } from "../store.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
 import { IconFile } from "../icons.tsx";
 import { useToast } from "../toast.tsx";
+import { useMentionRoster } from "../lib/useMentionRoster.ts";
 
 const isImage = (m?: string) => !!m && m.startsWith("image/");
 const handleKey = (s: string) => s.normalize("NFC").toLowerCase();
@@ -27,11 +28,13 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
 }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const { api, visibleAgents: agents, humans, machines, uploadOne, attachmentUrl } = useStore(); // visibleAgents: only real agents are @-mention candidates / reachability targets (not showcase demo props)
+  const { api, visibleAgents, humans, machines, uploadOne, attachmentUrl } = useStore();
   const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
   const [text, setText] = useState("");
   const [asTask, setAsTask] = useState(false);
   const [atQuery, setAtQuery] = useState<string | null>(null); // @ mention autocomplete: null = hidden
+  const roster = useMentionRoster(channelId, atQuery !== null);
+  const agents = useMemo(() => visibleAgents.filter(a => roster.members.some(m => m.type === "agent" && m.id === a.id)), [visibleAgents, roster.members]);
   const [atSel, setAtSel] = useState(0); // highlighted candidate index for ↑/↓ keyboard nav
   const [pendingAtts, setPendingAtts] = useState<any[]>([]); // uploaded attachments queued to send with the next message
   const [uploading, setUploading] = useState(false);
@@ -123,8 +126,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
   const onPaste = (e: RClipboardEvent) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/")).map((f, i) => new File([f], `pasted-${Date.now()}${i ? "-" + i : ""}.${f.type.split("/")[1] || "png"}`, { type: f.type })); if (imgs.length) { e.preventDefault(); addFiles(imgs); } };
   const onDrop = (e: RDragEvent) => { const fs = Array.from(e.dataTransfer?.files ?? []); if (fs.length) { e.preventDefault(); addFiles(fs); } };
 
-  // @ mention autocomplete: candidates are all workspace agents + humans (not just current channel members) —
-  // in a public channel, @-ing a non-member pulls them in (server-side auto-join), so suggesting them is intended.
+  // Candidates follow the server's current channel roster, including parent scope for threads.
   const onInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value; setText(v);
     const pos = e.target.selectionStart ?? v.length;
@@ -132,10 +134,10 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
     if (m) { setAtQuery(m[1]); atPosRef.current = pos - m[0].length; } else setAtQuery(null);
     setAtSel(0); // typing narrows the list → restart highlight at the top
   };
-  const cands = atQuery === null ? [] : [
-    ...agents.map((a) => ({ name: a.name, label: a.displayName || a.name, kind: "agent", avatarUrl: a.avatarUrl })),
-    ...humans.map((h) => ({ name: h.name, label: h.displayName || h.name, kind: "human", avatarUrl: h.avatarUrl })),
-  ].filter((c) => c.name && handleKey(c.name).includes(handleKey(atQuery || ""))).slice(0, 8);
+  const cands = atQuery === null ? [] : roster.members.map(m => ({
+    id: m.id, name: m.name, label: m.displayName || m.name, kind: m.type === "agent" ? "agent" : "human",
+    avatarUrl: m.type === "agent" ? agents.find(a => a.id === m.id)?.avatarUrl : humans.find(h => h.userId === m.id)?.avatarUrl,
+  })).filter(c => c.name && handleKey(c.name + " " + c.label).includes(handleKey(atQuery || ""))).slice(0, 8);
   const pick = (c: { name: string }) => {
     if (sendingRef.current) return;
     const start = atPosRef.current;
@@ -146,10 +148,11 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
 
   return (
     <div className={"composer" + (className ? " " + className : "")}>
+      {atQuery !== null && !cands.length && <div className="mention-menu" role="status" style={{ padding: "10px 14px", color: "var(--muted)" }}>{t(roster.status === "loading" ? "chat.mentionLoading" : roster.status === "error" ? "chat.mentionFailed" : "chat.mentionEmpty")}</div>}
       {atQuery !== null && cands.length > 0 && (
         <div className="mention-menu">
           {cands.map((c, i) => (
-            <button key={c.kind + c.name} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel} disabled={sending}
+            <button key={c.kind + c.id} className={"mention-opt" + (i === atSel ? " sel" : "")} aria-selected={i === atSel} disabled={sending}
               onMouseEnter={() => setAtSel(i)} onMouseDown={(e) => { e.preventDefault(); pick(c); }}>
               <Avatar seed={c.name} url={avFor(c.avatarUrl)} size={22} />
               <span className="grow">{c.label} <span className="mk-name">@{c.name}</span></span>
@@ -177,6 +180,8 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           placeholder={effectivePlaceholder}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return; // IME composition (CJK input): Enter selects a candidate, not send
+            if (atQuery !== null && e.key === "Escape") { e.preventDefault(); setAtQuery(null); return; }
+            if (atQuery !== null && roster.status !== "ready" && (e.key === "Enter" || e.key === "Tab")) { e.preventDefault(); return; }
             if (atQuery !== null && cands.length) { // @ menu open: ↑/↓ move highlight, Enter/Tab pick, Esc closes
               if (e.key === "ArrowDown") { e.preventDefault(); setAtSel((i) => Math.min(i + 1, cands.length - 1)); return; }
               if (e.key === "ArrowUp") { e.preventDefault(); setAtSel((i) => Math.max(i - 1, 0)); return; }

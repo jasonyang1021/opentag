@@ -12,6 +12,8 @@
 
 ## Active
 
+- **Channel-scoped mentions** — implementation and verification: [execution plan](./exec-plans/active/channel-mentions.md).
+
 - **Authorization hardening** — a two-plane security audit (human `routes-api` + agent `routes-agent`)
   surfaced ~20 access-control gaps; nearly all are closed. The canonical model + the **live status
   register** are in **[`docs/authorization.md`](./authorization.md)** §6 — check there, not here

@@ -1,9 +1,9 @@
-// Real end-to-end verification of Slack-style mention auto-join against the running Postgres + Redis.
+// Channel-scoped mention and thread-follow integration against running Postgres + Redis.
 // Requires infra up: `npm run infra` (pg :5433, redis :6380). Run: npx tsx test/mention.integration.ts
 // Creates a fully isolated workspace, exercises the actual createMessage() path, asserts, then cleans up.
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "../src/db/index.ts";
-import { createMessage, getOrCreateThread } from "../src/server/core.ts";
+import { createMessage, getOrCreateThread, addChannelMembers, mentionableMembers } from "../src/server/core.ts";
 
 const ts = Date.now();
 const owner = `owner_${ts}`, bob = `bob_${ts}`, ghost = `Éditeur-${ts}`, ghostMention = `E\u0301diteur-${ts}`;
@@ -74,14 +74,19 @@ async function main() {
   console.log("\n[1] PUBLIC channel: owner @s a non-member agent and a non-member human");
   const m1 = await createMessage({ serverId, channelId: pubCh, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghostMention} 跑下数据 @${bob} 你也看下` });
   const pm = await members(pubCh), p1 = await mentionsOf(m1.id);
-  check("non-member agent ghost auto-joined the channel", inChannel(pm, "agent", ghostId));
-  check("non-member human bob auto-joined the channel", inChannel(pm, "user", bobId));
-  check("mention to ghost is recorded (delivers/wakes — no longer silently dropped)", mentioned(p1, "agent", ghostId));
-  check("mention to bob is recorded", mentioned(p1, "user", bobId));
+  check("non-member agent ghost NOT added to the channel", !inChannel(pm, "agent", ghostId));
+  check("non-member human bob NOT added to the channel", !inChannel(pm, "user", bobId));
+  check("outsider agent has no structured mention", !mentioned(p1, "agent", ghostId));
+  check("outsider human has no structured mention", !mentioned(p1, "user", bobId));
 
   console.log("\n[2] PUBLIC channel: re-@ an existing member is idempotent (no duplicate rows)");
+  await addChannelMembers(pubCh, [{ type: "agent", id: ghostId }, { type: "user", id: bobId }]);
+  const [publicChannel] = await db.select().from(schema.channels).where(eq(schema.channels.id, pubCh));
+  const roster = await mentionableMembers(serverId, publicChannel!);
+  check("candidate roster includes explicitly added members", roster.some(m => m.id === ghostId) && roster.some(m => m.id === bobId));
   const before = (await members(pubCh)).length;
-  await createMessage({ serverId, channelId: pubCh, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghostMention} again` });
+  const existing = await createMessage({ serverId, channelId: pubCh, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghostMention} again` });
+  check("existing member mention still recorded", mentioned(await mentionsOf(existing.id), "agent", ghostId));
   check("member count unchanged on second mention", (await members(pubCh)).length === before);
 
   console.log("\n[3] PRIVATE channel: @ a non-member must NOT auto-join (no private-history leak)");
@@ -94,14 +99,19 @@ async function main() {
   check("bob NOT added to the DM", !inChannel(await members(dmCh), "user", bobId));
   check("no mention recorded for bob in DM", !mentioned(await mentionsOf(m4.id), "user", bobId));
 
-  // A thread inherits its PARENT channel's @-reach (mentionAutoJoinPool) — the core of this fix. ghost is a
+  // A thread inherits its PARENT channel's @-reach (mentionableMembers) — the core of this fix. ghost is a
   // workspace member but NOT a member of the freshly-created thread, so before the fix the @ was dropped.
-  console.log("\n[5] THREAD under a PUBLIC channel: @ a non-thread-member agent inherits the parent's workspace reach (auto-join + wake)");
+  console.log("\n[5] THREAD under a PUBLIC channel: @ a non-thread-member agent inherits the parent's member roster (auto-join + wake)");
   const parent5 = await createMessage({ serverId, channelId: pubCh, senderType: "user", senderId: ownerId, senderName: owner, content: "open a thread under the public channel" });
   const th5 = await getOrCreateThread(serverId, parent5.id, { type: "user", id: ownerId });
   const m5 = await createMessage({ serverId, channelId: th5.id, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghostMention} please pick up this thread` });
-  check("non-member agent ghost auto-joined the THREAD (parent is public → workspace reach)", inChannel(await members(th5.id), "agent", ghostId));
-  check("mention to ghost recorded in the thread (no longer silently dropped)", mentioned(await mentionsOf(m5.id), "agent", ghostId));
+  check("non-member agent ghost auto-joined the THREAD (parent membership)", inChannel(await members(th5.id), "agent", ghostId));
+  check("mention to ghost recorded in the thread", mentioned(await mentionsOf(m5.id), "agent", ghostId));
+  check("thread-follow watermark excludes triggering mention", (await members(th5.id)).find(m => m.memberType === "agent" && m.memberId === ghostId)?.lastReadSeq === m5.seq - 1);
+  await db.delete(schema.channelMembers).where(and(eq(schema.channelMembers.channelId, pubCh), eq(schema.channelMembers.memberId, ghostId)));
+  const removed = await createMessage({ serverId, channelId: th5.id, senderType: "user", senderId: ownerId, senderName: owner, content: `@${ghostMention} no longer in parent` });
+  check("stale thread membership cannot bypass removal from parent", !mentioned(await mentionsOf(removed.id), "agent", ghostId));
+  check("removed parent member absent from thread candidates", !(await mentionableMembers(serverId, th5)).some(m => m.id === ghostId));
 
   console.log("\n[6] THREAD under a PRIVATE channel: @ a non-parent-member must NOT auto-join (inherits private reach — no leak)");
   const parent6 = await createMessage({ serverId, channelId: privCh, senderType: "user", senderId: ownerId, senderName: owner, content: "open a thread under the private channel" });

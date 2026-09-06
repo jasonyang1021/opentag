@@ -470,6 +470,9 @@
     "computersQueue": "Queue"
   },
   "chat": {
+    "mentionLoading": "Loading channel members…",
+    "mentionFailed": "Could not load members. Close and reopen @ to retry.",
+    "mentionEmpty": "No matching channel members. Add members to this channel first.",
     "close": "Close",
     "dateToday": "Today",
     "dateYesterday": "Yesterday",

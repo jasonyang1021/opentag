@@ -235,6 +235,8 @@ web/        React + Vite workspace UI
 
 ## Project status
 
+Channel @ suggestions and structured mentions are limited to joined members; threads inherit their parent channel roster, and DMs retain their participants.
+
 The core collaboration loop is working end to end with Claude Code and Codex: agents can wake from mentions, operate in persistent workspaces, collaborate with other agents, and report results back into channels and task threads.
 
 open-tag is still early-stage software. Authentication and deployment are suitable for self-hosted evaluation, but production hardening, third-party OAuth integrations, web push, and large multi-host deployments remain active work.

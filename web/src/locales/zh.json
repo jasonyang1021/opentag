@@ -470,6 +470,9 @@
     "computersQueue": "队列"
   },
   "chat": {
+    "mentionLoading": "正在加载频道成员…",
+    "mentionFailed": "成员加载失败，请关闭并重新输入 @ 重试。",
+    "mentionEmpty": "没有匹配的频道成员，请先将对方加入频道。",
     "close": "关闭",
     "dateToday": "今天",
     "dateYesterday": "昨天",

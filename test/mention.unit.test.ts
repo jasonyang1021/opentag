@@ -1,4 +1,4 @@
-// Unit tests for Slack-style mention auto-join decision logic (pure; no DB writes).
+// Unit tests for channel-scoped mention and thread-follow decision logic (pure; no DB writes).
 // Run: npx tsx --test --test-force-exit test/mention.unit.test.ts
 // Importing core.ts opens a Redis connection (redis://localhost:6380) at module load; the functions
 // under test never touch it, and --test-force-exit tears the connection down when the tests finish.
@@ -51,8 +51,8 @@ test("parses canonically equivalent and combining-mark mentions", () => {
   );
 });
 
-test("auto-joins referenced workspace members who aren't channel members yet", () => {
-  // channel currently has only alice; message @s ghost (agent) and bob (human), both non-members
+test("follows a thread for referenced parent members not already following", () => {
+  // Parent roster contains ghost and bob; thread currently has only alice.
   const toAdd = membersToAutoJoin("@ghost please help, @bob you too", workspace, [alice]);
   assert.deepEqual(names(toAdd), ["bob", "ghost"]);
 });
@@ -88,14 +88,14 @@ test("membersToAutoJoin stays consistent with parseMentions (no matching drift)"
   assert.deepEqual(names(toAdd), names(recorded)); // none are current members → all referenced get added
 });
 
-// The `pool` argument is the @-reach of the space (mentionAutoJoinPool): the whole workspace for a public
-// channel / a thread under a public channel, but only the *current members* for private / DM channels and the
-// threads under them. These two tests pin the security boundary of the thread @-wake fix: a public thread pulls
-// any teammate in, a private/DM space never pulls an outsider in (no leak).
-test("public space (channel or thread under a public channel) auto-joins any @-ed teammate", () => {
-  // pool = whole workspace → a teammate who never spoke in the thread is still pulled in + woken
-  const toAdd = membersToAutoJoin("@ghost can you take this thread?", workspace, [alice]);
-  assert.deepEqual(names(toAdd), ["ghost"]);
+// Ordinary channels use their current roster; threads inherit only parent members.
+test("public channels do not resolve workspace outsiders", () => {
+  assert.deepEqual(parseMentions("@ghost @bob", [alice]), []);
+  assert.deepEqual(membersToAutoJoin("@ghost @bob", [alice], [alice]), []);
+});
+
+test("threads can follow parent members but not workspace outsiders", () => {
+  assert.deepEqual(names(membersToAutoJoin("@ghost @bob", [alice, ghost], [alice])), ["ghost"]);
 });
 
 test("members-only space (private / DM, and threads under them) never pulls in an outsider", () => {

@@ -3,7 +3,7 @@
 // every pre-join message). Requires infra up (pg :5433, redis :6380). Run: npx tsx test/agentJoinWatermark.integration.ts
 //
 // Covers two join paths:
-//   A) @-mention auto-join (createMessage path) — watermark MUST exclude the triggering @ message, so the agent
+//   A) Explicit membership before @ — watermark MUST exclude the following @ message, so the agent
 //      still sees the @ that pulled it in, but not the channel's prior backlog.
 //   B) direct add (addChannelMembers helper — the path agent-create→#all / CLI join / admin add-member share) —
 //      watermark = the channel's current max seq, so zero pre-join backlog is unread.
@@ -83,11 +83,12 @@ async function run() {
   const preMaxA = await channelMaxSeq(chA);
   const preMaxB = await channelMaxSeq(chB);
 
-  // ── A) @-mention auto-join: the triggering @ message must stay unread; the 3 prior messages must be read.
+  // ── A) Explicit membership is required before @; earlier history stays read.
+  await addChannelMembers(chA, [{ type: "agent", id: ghostAId }]);
   const atMsg = await post(chA, `@${ghostA} please look`);
   const mA = await memberRow(chA, "agent", ghostAId);
-  check("[A] @-mentioned agent auto-joined channel A", !!mA);
-  check("[A] watermark excludes the triggering @ (lastReadSeq == atSeq-1)", !!mA && mA.lastReadSeq === atMsg.seq - 1, `lastReadSeq=${mA?.lastReadSeq} atSeq=${atMsg.seq} preMax=${preMaxA}`);
+  check("[A] explicitly added agent remains in channel A", !!mA);
+  check("[A] explicit join watermark equals prior channel max", !!mA && mA.lastReadSeq === preMaxA, `lastReadSeq=${mA?.lastReadSeq} atSeq=${atMsg.seq} preMax=${preMaxA}`);
   const unreadA = await unreadCount(chA, ghostAId, mA?.lastReadSeq ?? 0);
   check("[A] only the @ message is unread (pre-join backlog NOT re-read)", unreadA === 1, `unread=${unreadA} (expected 1)`);
   // forward delivery intact: a message after join is still unread → total 2.
