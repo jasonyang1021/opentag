@@ -608,7 +608,8 @@
       "auth_register_name_invalid": "用户名需要 1 到 64 个字符。",
       "auth_register_email_taken": "这个邮箱已注册。请直接登录。",
       "auth_register_username_taken": "这个用户名已被占用。换一个 @ 提及名。",
-      "auth_rate_limited": "尝试次数太多。等一分钟后再试。"
+      "auth_rate_limited": "尝试次数太多，请稍后再试。",
+      "auth_rate_limited_wait": "尝试次数太多，请在 {{seconds}} 秒后重试。"
     },
     "opFailed": "操作失败",
     "joinFailed": "加入失败",

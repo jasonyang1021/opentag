@@ -7,13 +7,13 @@ import type { IncomingMessage } from "node:http";
 /**
  * Per-IP rate-limit constants for the registration endpoint.
  *
- * 5 attempts per hour is generous for a real user (registration is a one-time event)
- * and tight enough to stop bot/script bulk-registration.  Login keeps a looser default
+ * 50 attempts per hour accommodates invited colleagues sharing a public IP
+ * while retaining a bulk-registration guard. Login keeps its separate default
  * (10 per minute) because repeated attempts from a real user are normal.
  *
  * Exported so tests can assert on the exact contract without hard-coding magic numbers.
  */
-export const REGISTER_RATE_LIMIT = 5;
+export const REGISTER_RATE_LIMIT = 50;
 export const REGISTER_RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 type Bucket = { count: number; resetAt: number };

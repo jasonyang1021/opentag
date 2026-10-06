@@ -28,8 +28,11 @@ async function workspaceHome(token: string): Promise<string> {
   } catch { return "/"; }
 }
 
-function authErrorMessage(t: TFunction, data: any, fallback: string): string {
+export function authErrorMessage(t: TFunction, data: any, fallback: string): string {
   const code = typeof data?.code === "string" ? data.code : "";
+  if (code === "auth_rate_limited" && typeof data.retryAfter === "number" && Number.isFinite(data.retryAfter) && data.retryAfter > 0) {
+    return t("auth.errors.auth_rate_limited_wait", { seconds: Math.ceil(data.retryAfter) });
+  }
   if (code) {
     const translated = t(`auth.errors.${code}`, { defaultValue: "" });
     if (translated) return translated;

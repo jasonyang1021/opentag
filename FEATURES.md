@@ -120,3 +120,7 @@
 
 ## Web UI Polish
 - [x] **Icon micro-interactions (Amicro-style, pure CSS)**: semantic hover motion on interactive icons via one shared overshoot curve (`--im-spring`) and a two-class API (`im` trigger + `im-*` effect), zero JS/deps (`web/src/iconMotion.css`); hover-capable devices only + `prefers-reduced-motion` respected; principles + usage rules in `docs/icon-motion.md`
+
+## Registration rate-limit UX
+
+- [x] Shared-IP onboarding supports 50 registration attempts/hour; login brute-force guard remains 10/minute. Login, registration, and invitation forms display the server's remaining wait in seconds (English/Chinese).
