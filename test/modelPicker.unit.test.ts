@@ -29,4 +29,6 @@ test("endpoint checks tenant, status and runtime before discovery; no presets", 
   assert.ok(src.indexOf('owns.status !== "online"') < src.indexOf("await getDynamicModels"));
   assert.match(src, /owns.runtimes.includes\(runtime\)/);
   assert.doesNotMatch(src, /CODEX_FALLBACK_MODELS|const MODELS/);
+  // claude is probed like any other dynamic runtime; an empty probe is reported as probe_failed, not unsupported.
+  assert.doesNotMatch(src, /runtime !== "claude"|runtime === "claude"/);
 });

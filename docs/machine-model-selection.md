@@ -14,9 +14,15 @@ runtime before requesting the daemon. It returns `{models, source, reason}`:
 
 Successful lists are cached per machine/runtime for 60 seconds. Refresh uses
 `?refresh=1` to bypass the cache. CLI candidates are not a guarantee of account
-authorization, quota or successful inference. Unsupported discovery (including
-Claude help-only aliases, Copilot and Kimi) requires an explicit local-default
-selection; no model/effort override is sent. Local default is marked unverified.
+authorization, quota or successful inference. Unsupported discovery (Copilot and
+Kimi) requires an explicit local-default selection; no model/effort override is
+sent. Local default is marked unverified.
+
+Claude Code is probed via `claude --help`: the daemon returns the CLI's `--model`
+alias catalog (fable, opus, sonnet, haiku) and projects the advertised `--effort`
+superset through a per-model allow-list, so the reasoning picker only offers levels
+that model accepts. Aliases resolve to the newest model of each tier on the installed
+CLI; the list proves the CLI is installed, not that the account can use every alias.
 
 Codex uses the same executable resolution as agent startup, initializes a temporary
 app-server, and reads all `model/list` pages with hidden entries excluded. One
@@ -33,6 +39,12 @@ Deployment requires both server/web update and daemon 0.15.3 or later on each
 compute host. A local build/commit is not a published npm release. This change
 does not alter existing agents or add create-time inference calls. Project-specific
 CLI configuration and account access still need real-run verification.
+
+Daemon 0.15.4 runs every shell probe through `spawnSafe` (the executable resolution
+agent startup uses). On Windows, npm-installed CLIs such as `claude` are `.cmd` shims
+that a bare node spawn cannot execute; before 0.15.4 that ENOENT surfaced as an empty
+list / `probe_failed`. Claude discovery also needs the server change that stops
+special-casing `claude` as `discovery_unsupported`.
 
 Tests: `test/codexModels.unit.test.ts` covers protocol, pagination, errors, timeout
 and hidden entries; `test/modelPicker.unit.test.ts` covers viewport geometry and

@@ -9,7 +9,8 @@ export interface ModelOption {
   thinking?: { levels: { value: string; label: string; description?: string }[]; default?: string };
 }
 
-// CLI discovery capabilities. Claude's help-only catalog is not account-aware and is not exposed by the picker.
+// CLI discovery capabilities. Claude's catalog is the CLI's alias list (not account-aware) plus effort levels
+// read from `claude --help`; like every other probe it is a candidate list, not an authorization guarantee.
 export const DYNAMIC_RUNTIMES = new Set(["opencode", "cursor", "pi", "hermes", "claude", "codex", "reasonix"]);
 
 const TTL_MS = 60_000; // matches multica's 60s model cache — lists rarely change within a minute
