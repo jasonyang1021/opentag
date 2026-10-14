@@ -4,13 +4,15 @@
 //
 // Scope: opencode / cursor / pi enumerate models; Hermes enumerates local profiles; reasonix
 // enumerates the providers/models of its resolved config via `reasonix doctor --json`.
-//  - Codex uses app-server model/list; Claude help describes effort aliases, not account access.
+//  - Codex uses app-server model/list; Claude returns its CLI alias catalog + effort levels from `--help`
+//    (installed-CLI evidence, not account access — the same caveat every probe carries).
 //  - copilot / kimi would need an ACP (JSON-RPC over stdio) handshake — not done yet.
-//  Both gaps are tracked in docs/tech-debt-tracker.md.
+//  That gap is tracked in docs/tech-debt-tracker.md.
 //
 // The parse functions are pure (unit-tested against fixtures captured from multica's discovery
 // research) and mirror multica's server/pkg/agent/models.go field-for-field.
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
+import { spawnSafe } from "./spawnSafe.js";
 import { discoverCodexModels } from "./codexModels.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -44,8 +46,10 @@ function isModelId(s: string): boolean {
 // max is not offered on Haiku. So we parse the superset, then project it through a per-model allow-list
 // (multica's hand-maintained claudeModelEffortAllow, MUL-2339, thinking.go — collapsed to our short ids).
 // Over-offering a level the model rejects would defeat the point of discovery, so we filter, not flatten.
+// Ids are the `--model` aliases `claude --help` advertises ("an alias for the latest model, e.g. 'fable',
+// 'opus', or 'sonnet'"), so each always resolves to the newest model of that tier on the installed CLI.
 const CLAUDE_MODELS: { id: string; label: string }[] = [
-  { id: "sonnet", label: "Sonnet" }, { id: "opus", label: "Opus" }, { id: "haiku", label: "Haiku" },
+  { id: "fable", label: "Fable" }, { id: "opus", label: "Opus" }, { id: "sonnet", label: "Sonnet" }, { id: "haiku", label: "Haiku" },
 ];
 
 // Friendly labels for Claude's effort tokens (matches Anthropic's own slash UI; titleCase would give "Xhigh").
@@ -278,13 +282,15 @@ const OUT_CAP = 256 * 1024; // bound memory if a CLI floods stdout
 // Run a runtime's list command and capture stdout/stderr. Uses the daemon's own env (so the CLI sees
 // the same login/config the agent runs use) minus NODE_OPTIONS — a proxy flag there makes some
 // bundled CLIs refuse to start (same gotcha the opencode/cursor/pi runtimes guard against).
+// Launched through spawnSafe — the same executable resolution agent startup uses — because on Windows
+// npm-installed CLIs are `.cmd` shims that a bare node spawn cannot execute (ENOENT → empty probe).
 function runList(bin: string, args: string[], timeoutMs: number = LIST_TIMEOUT_MS): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve) => {
     const env = { ...process.env };
     delete env.NODE_OPTIONS;
     let proc: ChildProcess;
     try {
-      proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
+      proc = spawnSafe(bin, args, { stdio: ["ignore", "pipe", "pipe"], env });
     } catch (e) {
       return resolve({ stdout: "", stderr: String((e as any)?.message ?? e), code: 1 });
     }

@@ -144,11 +144,13 @@ export async function handleServersServerScope(ctx: ServerCtx): Promise<boolean>
     if (owns.status !== "online") return (sendJson(res, 200, { models: [], source: "unavailable", reason: "machine_offline" }), true);
     if (!Array.isArray(owns.runtimes) || !owns.runtimes.includes(runtime))
       return (sendJson(res, 200, { models: [], source: "unavailable", reason: "runtime_missing" }), true);
-    if (DYNAMIC_RUNTIMES.has(runtime) && runtime !== "claude") {
+    // claude is probed like every other DYNAMIC_RUNTIMES member: the daemon confirms the CLI is installed
+    // and reads its `--effort` levels, so the picker can offer the alias catalog + per-model reasoning.
+    if (DYNAMIC_RUNTIMES.has(runtime)) {
         const models = await getDynamicModels(machineId, runtime, url.searchParams.get("refresh") === "1");
         if (models?.length) return (sendJson(res, 200, { models, source: "cli", reason: null }), true);
     }
-    return (sendJson(res, 200, { models: [], source: "unavailable", reason: runtime === "claude" || !DYNAMIC_RUNTIMES.has(runtime) ? "discovery_unsupported" : "probe_failed" }), true);
+    return (sendJson(res, 200, { models: [], source: "unavailable", reason: DYNAMIC_RUNTIMES.has(runtime) ? "probe_failed" : "discovery_unsupported" }), true);
   }
   // Reminders (read-only for users): reminders can only be created by the agent side via CLI; user side GETs to list them. ?ownerAgentId=&status=scheduled
   const mprof = /^\/api\/servers\/[^/]+\/members\/([^/]+)\/profile$/.exec(p);

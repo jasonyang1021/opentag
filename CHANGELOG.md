@@ -9,6 +9,13 @@ from `main`; see commit history for fine-grained server/web changes.
 
 ## [Unreleased]
 
+## [0.15.4] — 2026-10-12
+
+### Fixed
+
+- Model discovery probes (`claude`, `opencode`, `cursor`, `pi`, `reasonix`) launch through the same Windows executable resolution as agent startup, so npm-installed `.cmd` CLIs no longer fail with ENOENT and an empty list.
+- Claude Code exposes its CLI alias catalog (Fable / Opus / Sonnet / Haiku) with per-model effort levels in the create-agent picker; the server no longer special-cases it as unsupported. Requires the matching server update.
+
 ## [0.15.3] — 2026-09-06
 
 ### Fixed
