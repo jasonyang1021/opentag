@@ -7,6 +7,16 @@
 
 ## Open items
 
+### I107 — Running Activity recovery durability and live acceptance
+
+`liveAgentReplies.ts` is a bounded single-process projection, not a durable run ledger.
+Server restart, 24-hour inactivity, or capacity eviction loses the pending tail; subsequent
+events rebuild a partial preview. Durable messages and Activity logs are unchanged.
+Shared/durable recovery is deferred with multi-instance realtime (I6). Deterministic tests,
+typecheck and build cover navigation recovery and races; an isolated DB/daemon/browser run
+is still needed (local Docker engine and required chrome-devtools tooling unavailable).
+See `docs/activity-recovery.md`. Status: pending durability/live acceptance.
+
 ### I106 — Collaboration polish live acceptance pending
 
 Task-toolbar/desktop-notification policy and file-delivery guidance are implemented;

@@ -8,6 +8,7 @@ import { fmtDateTime, isSameLocalDay, fmtDateDivider } from "../format";
 import { PAGE_SIZE, appendWithCap, nextScrollState } from "../lib/msgPaging";
 import { AGENT_REPLY_PREVIEW_TYPE, AGENT_REPLY_STREAM_TICK_MS, absorbPersistedAgentMessagePreview, applyAgentReplyPreview, dropAgentReplyPreviewsForMessage, hasStreamingAgentReplyPreview, mergePersistedAgentMessageUpdate, renderKeyForMessage, tickAgentReplyPreviews, type AgentReplyEvent, type AgentReplyPreviewMsg } from "../lib/agentReplyPreview";
 import { avatarSeedFor } from "../lib/avatarIdentity";
+import { recoverAgentReplyPage, type MessageLoad } from "../lib/agentReplyRecovery";
 import { copyText } from "../lib/clipboard.ts";
 import { MessageContent, type NameItem, type Nav } from "../messageRender.tsx";
 import { nextThreadMeta } from "../threadUnread";
@@ -189,6 +190,7 @@ export function Chat() {
   const [hoverAgent, setHoverAgent] = useState<{ id: string; x: number; y: number } | null>(null); // hovering over an agent shows a quick-info hover card
   const [ctxMenu, setCtxMenu] = useState<{ m: Msg; x: number; y: number } | null>(null); // right-clicking a message opens the context action menu
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const messageLoadRef = useRef<MessageLoad | null>(null);
   const [loaded, setLoaded] = useState(false); // first fetch for the current channel done — gates the empty-channel state so it never flashes mid-load
   const [loadError, setLoadError] = useState(false); // first fetch failed — exits the skeleton into a retryable error state
   const [sub, setSub] = useState("");
@@ -253,6 +255,7 @@ export function Chat() {
   // makes the new channel paint its skeleton immediately, never the prior channel's stale list.
   const [shownChannelId, setShownChannelId] = useState(cur?.id);
   if (cur?.id !== shownChannelId) {
+    messageLoadRef.current = null;
     setShownChannelId(cur?.id);
     setMsgs([]);
     setLoaded(false);
@@ -266,30 +269,33 @@ export function Chat() {
   const loadCurrentMessages = async () => {
     if (!cur) return;
     const chId = cur.id;
+    const request: MessageLoad = { channelId: chId, events: [] };
+    messageLoadRef.current = request;
     setLoaded(false);
     setLoadError(false);
     try {
       const d = await api("GET", `/api/messages/channel/${chId}?limit=${PAGE_SIZE}`);
-      if (curIdRef.current !== chId) return;
-      const ms: Msg[] = d.messages || [];
+      if (curIdRef.current !== chId || messageLoadRef.current !== request) return;
+      if (!Array.isArray(d.messages)) throw new Error(d.error || "Failed to load messages");
+      const ms = recoverAgentReplyPage(chId, d.messages, d.activeReplies || [], request.events);
       setMsgs(ms);
       setHasMore(!!d.hasMore);
       markRead(chId);
-      const ids = ms.map((m) => m.id);
+      const ids = ms.filter((m) => m.messageType !== AGENT_REPLY_PREVIEW_TYPE).map((m) => m.id);
       if (ids.length) {
         try {
           const meta = await api("GET", `/api/channels/${chId}/threads?parentMessageIds=${ids.join(",")}`);
-          if (curIdRef.current === chId) setThreadMeta(meta || {});
-        } catch { if (curIdRef.current === chId) setThreadMeta({}); }
+          if (curIdRef.current === chId && messageLoadRef.current === request) setThreadMeta(meta || {});
+        } catch { if (curIdRef.current === chId && messageLoadRef.current === request) setThreadMeta({}); }
       } else setThreadMeta({});
     } catch {
-      if (curIdRef.current !== chId) return;
+      if (curIdRef.current !== chId || messageLoadRef.current !== request) return;
       setMsgs([]);
       setThreadMeta({});
       setHasMore(false);
       setLoadError(true);
     } finally {
-      if (curIdRef.current === chId) setLoaded(true);
+      if (curIdRef.current === chId && messageLoadRef.current === request) { messageLoadRef.current = null; setLoaded(true); }
     }
   };
   useEffect(() => { if (!cur) return; setThread(null); setProfile(null); loadingOlderRef.current = false; prependRestoreRef.current = null; subscribeChannel(cur.id); void loadCurrentMessages(); }, [cur?.id]);
@@ -322,6 +328,8 @@ export function Chat() {
   }, [agentPanelReq]);
   useEffect(() => onEvent((e) => {
     if (!cur) return;
+    if (e.type === "realtime:ready") { if (!e.channelId || e.channelId === cur.id) void loadCurrentMessages(); return; }
+    if (messageLoadRef.current?.channelId === cur.id && (e.channelId === cur.id || e.message?.channelId === cur.id)) messageLoadRef.current.events.push(e);
     if (e.type === "message" && e.channelId === cur?.id) { if (e.message.senderType === "user" && e.message.senderId === me?.id) forceBottomPinRef.current = true; setMsgs((m) => { const preview = absorbPersistedAgentMessagePreview(m, e.message); if (preview.consumed) { forceBottomPinRef.current = true; newMsgOrderRef.current.delete(e.message.id); return preview.messages; } const idx = Math.min(burstCountRef.current, 7); newMsgOrderRef.current.set(e.message.id, idx); burstCountRef.current += 1; if (burstTimerRef.current) clearTimeout(burstTimerRef.current); burstTimerRef.current = setTimeout(() => { burstCountRef.current = 0; burstTimerRef.current = null; }, 600); const { next, trimmed } = appendWithCap(dropAgentReplyPreviewsForMessage(m, e.message), e.message, atBottomRef.current && !loadingOlderRef.current); if (trimmed) trimmedRef.current = true; return next; }); markRead(cur.id); } // don't trim mid-pagination: a trim's setHasMore(true) would race the in-flight loadOlder's setHasMore — suppressing it closes the window (the next message trims instead)
     else if (e.type === "message:updated" && e.message) setMsgs((m) => mergePersistedAgentMessageUpdate(m, e.message)); // sync reactions, tasks, and finalized Activity tails
     else if (e.type === "agent:reply" && e.channelId === cur?.id) { forceBottomPinRef.current = true; setMsgs((m) => applyAgentReplyPreview(m, e as AgentReplyEvent, agents.find((a) => a.id === e.agentId))); }
@@ -756,8 +764,24 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
   };
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { subscribeChannel(channelId); (async () => { const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`); setMsgs(d.messages || []); })(); }, [channelId]); // join the thread room so replies arrive live (openThread/startThread do not make the socket a room member on their own)
+  const threadLoadRef = useRef<MessageLoad | null>(null);
+  const [threadLoadError, setThreadLoadError] = useState(false);
+  const loadThread = async () => {
+    const request: MessageLoad = { channelId, events: [] };
+    threadLoadRef.current = request;
+    setThreadLoadError(false);
+    try {
+      const d = await api("GET", `/api/messages/channel/${channelId}?limit=200`);
+      if (threadLoadRef.current !== request) return;
+      if (!Array.isArray(d.messages)) throw new Error(d.error || "Failed to load thread");
+      setMsgs(recoverAgentReplyPage(channelId, d.messages, d.activeReplies || [], request.events));
+    } catch { if (threadLoadRef.current === request) { setMsgs([]); setThreadLoadError(true); } }
+    finally { if (threadLoadRef.current === request) threadLoadRef.current = null; }
+  };
+  useEffect(() => { setMsgs([]); subscribeChannel(channelId); void loadThread(); return () => { threadLoadRef.current = null; }; }, [channelId]);
   useEffect(() => onEvent((e) => {
+    if (e.type === "realtime:ready") { if (!e.channelId || e.channelId === channelId) void loadThread(); return; }
+    if (threadLoadRef.current?.channelId === channelId && (e.channelId === channelId || e.message?.channelId === channelId)) threadLoadRef.current.events.push(e);
     if (e.type === "message" && e.channelId === channelId) setMsgs((m) => {
       const preview = absorbPersistedAgentMessagePreview(m, e.message);
       if (preview.consumed) return preview.messages;
@@ -834,6 +858,7 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
       <div className="scroll" ref={scrollRef}>
         <div className="thread-parent">{row(parent)}</div>
         <div className="thread-sep">{t("chat.replyCount", { count: msgs.length })}</div>
+        {threadLoadError && <div role="alert">{t("chat.loadFailedTitle")} <button className="joinbtn" onClick={loadThread}>{t("chat.retryLoad")}</button></div>}
         {msgs.map((m, i) => {
           const prevMsg = msgs[i - 1];
           const dateDivider: ReactNode = m.createdAt && !isSameLocalDay(m.createdAt, prevMsg?.createdAt)

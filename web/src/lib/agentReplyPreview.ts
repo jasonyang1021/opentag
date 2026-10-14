@@ -68,8 +68,9 @@ export function applyAgentReplyPreview(messages: Msg[], e: AgentReplyEvent, agen
   const idx = findStreamTargetIndex(messages, e);
 
   if (e.op === "activity") {
-    if (idx < 0 || !e.entries?.length) return messages;
-    return messages.map((m, i) => i === idx ? { ...m, agentActivity: [...(m.agentActivity ?? []), ...e.entries!] } : m);
+    if (!e.entries?.length) return messages;
+    if (idx < 0) return applyAgentReplyPreview(messages, { ...e, op: "start" }, agent, now);
+    return messages.map((m, i) => i === idx ? { ...m, agentActivity: mergeActivity(m.agentActivity, e.entries) } : m);
   }
   // Legacy daemon deltas are deliberately ignored: runtime output is Activity, never provisional public message content.
   if (e.op === "delta") return messages;
@@ -83,9 +84,11 @@ export function applyAgentReplyPreview(messages: Msg[], e: AgentReplyEvent, agen
   }
   if (idx >= 0) {
     if (!e.entries?.length) return messages;
-    return messages.map((m, i) => i === idx ? { ...m, agentActivity: [...(m.agentActivity ?? []), ...e.entries!] } : m);
+    return messages.map((m, i) => i === idx ? { ...m, agentActivity: mergeActivity(m.agentActivity, e.entries) } : m);
   }
   if (e.op !== "start") return messages;
+  if (messages.some((m) => m.senderId === e.agentId && m.channelId === e.channelId
+    && m.agentActivityStreamId === e.streamId && (m.agentActivityState === "handled" || m.agentActivityState === "error"))) return messages;
 
   const withoutSuperseded = messages.filter((m) => !(m.messageType === AGENT_REPLY_PREVIEW_TYPE && m.channelId === e.channelId && m.senderId === e.agentId));
   const preview: AgentReplyPreviewMsg = {
@@ -106,6 +109,12 @@ export function applyAgentReplyPreview(messages: Msg[], e: AgentReplyEvent, agen
     agentActivityState: "running",
   };
   return [...withoutSuperseded, preview];
+}
+
+function mergeActivity(a: Msg["agentActivity"] = [], b: Msg["agentActivity"] = []): NonNullable<Msg["agentActivity"]> {
+  const key = (e: NonNullable<Msg["agentActivity"]>[number]) => JSON.stringify([e.timestamp, e.kind, e.activity ?? null, e.detail ?? null, e.text ?? null, e.toolName ?? null, e.toolInput ?? null]);
+  const seen = new Set(a.map(key));
+  return [...a, ...b.filter((e) => { const k = key(e); if (seen.has(k)) return false; seen.add(k); return true; })];
 }
 
 export function dropAgentReplyPreviewsForMessage(messages: Msg[], msg: Msg): Msg[] {

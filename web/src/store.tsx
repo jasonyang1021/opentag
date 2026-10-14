@@ -339,7 +339,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       // The server emits this only after its asynchronous membership lookup and room joins finish. Refreshing here
       // closes the initial/reconnect gap even when message catch-up fails or samples before room delivery is ready.
-      sock.on("rooms:joined", syncUnread);
+      sock.on("rooms:joined", () => { syncUnread(); dispatch({ type: "realtime:ready" }); });
+      sock.on("channel:joined", (p: { channelId: string }) => dispatch({ type: "realtime:ready", channelId: p.channelId }));
       sock.on("message:new", (msg: any) => {
         if (msg?.seq) lastSeq = Math.max(lastSeq, msg.seq);
         if (msg?.channelId) {
