@@ -7,6 +7,22 @@
 
 ## Open items
 
+### I108 — Agent auto-restore live acceptance pending
+
+Persistent lifecycle intent and reconnect orchestration have deterministic unit coverage,
+but the additive migration and real Windows daemon restart need isolated DB/Redis/daemon
+acceptance. Local Docker engine and required chrome-devtools tooling are unavailable.
+Verify upgrade twice, manual-stop exclusion, offline stop, resource queue, machine/tenant
+isolation, session resume, and repeated reconnect against the plan before production rollout.
+The per-agent FIFO is single-server-process (same deployment constraint as I6). Restore
+does not change message-triggered wakes or provide exactly-once external tool execution.
+Deployment smoke acceptance: additive migration succeeded and its startup rerun was
+idempotent; reconnect restored four enabled agents to active while 25 disabled agents
+remained inactive. One startup exceeded the 30-second control ACK deadline before later
+reporting active; queued historical Turn deliveries also logged ACK timeouts. These
+warnings need separate runtime observation, not a claim of complete message recovery.
+Status: deployed; full Windows process-restart/browser acceptance remains pending.
+
 ### I107 — Running Activity recovery durability and live acceptance
 
 `liveAgentReplies.ts` is a bounded single-process projection, not a durable run ledger.

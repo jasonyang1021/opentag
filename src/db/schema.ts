@@ -66,6 +66,7 @@ export const agents = pgTable("agents", {
   avatarUrl: text("avatar_url"),
   description: text("description"),               // role / system prompt seed
   status: text("status").default("inactive").notNull(),   // inactive | starting | active | sleeping | queued
+  autoRestore: boolean("auto_restore").default(false).notNull(), // explicit start intent; independent of connection/process status
   activity: text("activity").default("offline").notNull(),// offline|online|thinking|working
   sessionId: text("session_id"),                  // current runtime session (used with --resume)
   model: text("model"),                            // model alias or NULL → CLI uses its local default (~/.claude / ~/.codex)

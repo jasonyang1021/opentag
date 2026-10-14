@@ -28,7 +28,7 @@
   "scripts": {
     "infra": "docker compose up -d",
     "infra:down": "docker compose down",
-    "db:push": "node scripts/migrate-reply-coordination-directed.mjs && drizzle-kit push",
+    "db:push": "node scripts/migrate-reply-coordination-directed.mjs && node scripts/migrate-agent-auto-restore.mjs && drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx src/db/seed.ts",
     "seed:dev": "tsx src/db/seed-dev.ts",
