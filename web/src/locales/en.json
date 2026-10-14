@@ -608,7 +608,8 @@
       "auth_register_name_invalid": "Usernames need 1-64 characters.",
       "auth_register_email_taken": "That email already has an account. Sign in instead.",
       "auth_register_username_taken": "That username is taken. Choose another @mention name.",
-      "auth_rate_limited": "Too many attempts. Wait a minute and try again."
+      "auth_rate_limited": "Too many attempts. Please try again later.",
+      "auth_rate_limited_wait": "Too many attempts. Try again in {{seconds}} seconds."
     },
     "opFailed": "Operation failed",
     "joinFailed": "Failed to join",

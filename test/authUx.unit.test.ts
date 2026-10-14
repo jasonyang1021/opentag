@@ -3,11 +3,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createInstance } from "../web/node_modules/i18next/dist/esm/i18next.js";
+import { authErrorMessage } from "../web/src/views/Auth.tsx";
 
 const routeSrc = fs.readFileSync(new URL("../src/server/routes-api/auth.ts", import.meta.url), "utf8");
 const authSrc = fs.readFileSync(new URL("../web/src/views/Auth.tsx", import.meta.url), "utf8");
 const en = JSON.parse(fs.readFileSync(new URL("../web/src/locales/en.json", import.meta.url), "utf8"));
 const zh = JSON.parse(fs.readFileSync(new URL("../web/src/locales/zh.json", import.meta.url), "utf8"));
+
+test("auth rate limit copy uses server retryAfter for registration and login", async () => {
+  const i18n = createInstance();
+  await i18n.init({ lng: "en", resources: { en: { translation: en }, zh: { translation: zh } } });
+  assert.equal(authErrorMessage(i18n.t, { code: "auth_rate_limited", retryAfter: 3600 }, "failed"), "Too many attempts. Try again in 3600 seconds.");
+  assert.equal(authErrorMessage(i18n.t, { code: "auth_rate_limited", retryAfter: 12.1 }, "failed"), "Too many attempts. Try again in 13 seconds.");
+  for (const retryAfter of [undefined, null, -1, 0, NaN, Infinity, "60"]) {
+    assert.equal(authErrorMessage(i18n.t, { code: "auth_rate_limited", retryAfter }, "failed"), "Too many attempts. Please try again later.");
+  }
+  await i18n.changeLanguage("zh");
+  assert.equal(authErrorMessage(i18n.t, { code: "auth_rate_limited", retryAfter: 59 }, "失败"), "尝试次数太多，请在 59 秒后重试。");
+});
 
 test("login distinguishes unknown email from wrong password with stable error codes", () => {
   assert.match(routeSrc, /auth_login_email_not_found/);

@@ -1,19 +1,29 @@
 // Unit tests for the registration rate limit.
 // Contract: POST /api/auth/register is capped at REGISTER_RATE_LIMIT requests per
-// REGISTER_RATE_WINDOW_MS per IP — stricter than the login default (brute-force guard),
-// because legitimate users register at most once; repeated attempts from the same IP
-// in a short window are almost certainly bot/script behaviour.
+// REGISTER_RATE_WINDOW_MS per IP, allowing colleagues behind a shared NAT to register.
 //
 // Run: npx tsx --test --test-force-exit test/registerRateLimit.unit.test.ts
 import test from "node:test";
 import assert from "node:assert/strict";
-// REGISTER_RATE_LIMIT / REGISTER_RATE_WINDOW_MS are exported only after the fix.
-// On origin/main they do not exist → this import fails → all tests below fail.
-// That is the "red on main" evidence required by the goal contract.
 import { rateLimit, REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS } from "../src/server/ratelimit.ts";
 
-test("REGISTER_RATE_LIMIT is 5 (one registration per ~hour is ample for a real user)", () => {
-  assert.equal(REGISTER_RATE_LIMIT, 5);
+test("login remains capped at ten attempts per minute, separately from registration", () => {
+  const now = 5_000_000;
+  for (let i = 0; i < 10; i++) assert.equal(rateLimit("login-regression", "192.0.2.50", undefined, undefined, now).ok, true);
+  assert.deepEqual(rateLimit("login-regression", "192.0.2.50", undefined, undefined, now + 1000), { ok: false, retryAfter: 59 });
+  assert.equal(rateLimit("registration-regression", "192.0.2.50", REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, now).ok, true);
+  assert.equal(rateLimit("login-regression", "192.0.2.50", undefined, undefined, now + 60_000).ok, true);
+});
+
+test("blocked retries do not extend the registration window", () => {
+  const now = 6_000_000;
+  for (let i = 0; i < REGISTER_RATE_LIMIT; i++) rateLimit("retry-window", "192.0.2.51", REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, now);
+  assert.deepEqual(rateLimit("retry-window", "192.0.2.51", REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, now + 60_000), { ok: false, retryAfter: 3540 });
+  assert.equal(rateLimit("retry-window", "192.0.2.51", REGISTER_RATE_LIMIT, REGISTER_RATE_WINDOW_MS, now + REGISTER_RATE_WINDOW_MS).ok, true);
+});
+
+test("REGISTER_RATE_LIMIT is 50 for shared-IP invitation onboarding", () => {
+  assert.equal(REGISTER_RATE_LIMIT, 50);
 });
 
 test("REGISTER_RATE_WINDOW_MS is 1 hour (3 600 000 ms)", () => {
