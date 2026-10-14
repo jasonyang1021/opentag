@@ -9,6 +9,7 @@ import { publish } from "./realtime.js";
 import { createLogger } from "../log.js";
 import { MACHINE_REJECTED_CODE } from "../daemonProtocol.js";
 import { catchUpAgentsOnMachine } from "./reconnectCatchup.js";
+import { restoreAgentsOnMachine } from "./agentAutoRestore.js";
 import { markMachineAgentsOffline } from "./machineLiveness.js";
 import { ACTIVITY_LOG_CAP, logActivity, pruneAgentActivityLog, startAgentActivityRun } from "./agentActivity.js";
 import { finalizeAgentActivityRun } from "./core.js";
@@ -66,13 +67,18 @@ async function onDaemon(ws: WebSocket, key: string): Promise<void> {
         const alreadyCurrent = isCurrentMachineConn(machineId, ws);
         registerMachineConn(machineId, ws);
         try { ws.send(JSON.stringify({ type: "ready:ack", machineId })); } catch { /* */ }
+        const readyMachineId = machineId;
+        const isCurrent = () => isCurrentMachineConn(readyMachineId, ws) && ws.readyState === 1;
         // The machine connection must be indexed before catch-up sends agent:start/deliver to it.
         void (async () => {
-          if (!alreadyCurrent && !conversationTurnDeliveryBlockReason(serverId!, machineId)) {
-            await resumeConversationTurnsForMachine(serverId!, machineId, false);
+          const restoredIds = alreadyCurrent ? runningIds
+            : await restoreAgentsOnMachine(serverId!, readyMachineId, runningIds, isCurrent);
+          if (!isCurrent()) return;
+          if (!alreadyCurrent && !conversationTurnDeliveryBlockReason(serverId!, readyMachineId)) {
+            await resumeConversationTurnsForMachine(serverId!, readyMachineId, false);
           }
           await handleConversationTurnDaemonTopologyChange(serverId!);
-          await catchUpAgentsOnMachine(serverId!, machineId, runningIds);
+          if (isCurrent()) await catchUpAgentsOnMachine(serverId!, readyMachineId, restoredIds);
         })().catch((e: any) => log.error("catch-up failed", { machineId, detail: String(e?.message ?? e) }));
       }
       else if (msg.type === "agent:status" || msg.type === "agent:activity") await onAgentUpdate(serverId!, msg);

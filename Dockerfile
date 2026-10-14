@@ -36,6 +36,7 @@ COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/scripts/migrate-reply-coordination-directed.mjs ./scripts/migrate-reply-coordination-directed.mjs
+COPY --from=build /app/scripts/migrate-agent-auto-restore.mjs ./scripts/migrate-agent-auto-restore.mjs
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app
 USER node

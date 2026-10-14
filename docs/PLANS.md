@@ -12,6 +12,8 @@
 
 ## Active
 
+- **Agent auto-restore** — persistent lifecycle intent and reconnect restoration; [execution plan](./exec-plans/active/agent-auto-restore.md).
+
 - **Collaboration polish** — [execution plan](./exec-plans/active/collaboration-polish.md).
 
 - **Channel-scoped mentions** — implementation and verification: [execution plan](./exec-plans/active/channel-mentions.md).

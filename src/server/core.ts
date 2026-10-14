@@ -17,6 +17,8 @@ import { dispatchConversationTurn as dispatchConversationTurnWithDeps, dispatchL
 import { AGENT_CONTROL_ACK_CAPABILITY, DELIVERY_ADMISSION_CAPABILITY, PROJECT_DIRECTORY_CAPABILITY } from "../daemonProtocol.js";
 import { type AgentInputPolicy, inputSenderAllowed } from "./agentInputPolicy.js";
 import { agentInputVisible } from "./agentInputView.js";
+import { serializeAgentLifecycle } from "./agentLifecycleQueue.js";
+import { canRestoreAgent, setAgentRunIntent, type AgentRestoreContext } from "./agentRunIntent.js";
 
 const log = createLogger("server:core");
 const ERROR_RECEIPT_WINDOW_MS = 10 * 60 * 1000;
@@ -1176,11 +1178,23 @@ async function agentControlTarget(serverId: string, agentId: string): Promise<Ag
   return { ok: true, machineId: a.machineId };
 }
 /** Start an agent (requires local daemon to be online). */
-export async function startAgent(serverId: string, agentId: string): Promise<{ ok: boolean; reason?: string }> {
+export function startAgent(serverId: string, agentId: string, restore?: AgentRestoreContext): Promise<AgentControlResult> {
+  return serializeAgentLifecycle(serverId, agentId, async () => {
+    if (restore) {
+      if (!await canRestoreAgent(serverId, agentId, restore)) return { ok: false, reason: "restore no longer eligible" };
+    } else if (!await setAgentRunIntent(serverId, agentId, true)) return { ok: false, reason: "agent not found" };
+    return startAgentNow(serverId, agentId, restore);
+  });
+}
+async function startAgentNow(serverId: string, agentId: string, restore?: AgentRestoreContext): Promise<AgentControlResult> {
   const target = await agentStartTarget(serverId, agentId);
   if (!target.ok) {
     if (target.reason !== "agent not found") await markAgentUnavailable(serverId, agentId, target.reason);
     return { ok: false, reason: target.reason };
+  }
+  if (restore && (!restore.isCurrent() || target.machineId !== restore.machineId)) {
+    await markAgentUnavailable(serverId, agentId, "restore connection changed");
+    return { ok: false, reason: "restore connection changed" };
   }
   const result = await requestAgentControl(serverId, target, { type: "agent:start", agentId, config: target.cfg });
   if (!result.ok) { await markAgentUnavailable(serverId, agentId, result.reason ?? "cannot start"); return result; }
@@ -1188,6 +1202,12 @@ export async function startAgent(serverId: string, agentId: string): Promise<{ o
   return { ok: true };
 }
 export async function stopAgent(serverId: string, agentId: string): Promise<AgentControlResult> {
+  return serializeAgentLifecycle(serverId, agentId, async () => {
+    await setAgentRunIntent(serverId, agentId, false);
+    return stopAgentNow(serverId, agentId);
+  });
+}
+async function stopAgentNow(serverId: string, agentId: string): Promise<AgentControlResult> {
   const target = await agentControlTarget(serverId, agentId);
   if (!target.ok) return target;
   const result = await requestAgentControl(serverId, target, { type: "agent:stop", agentId });
@@ -1197,6 +1217,12 @@ export async function stopAgent(serverId: string, agentId: string): Promise<Agen
   return { ok: true };
 }
 export async function dequeueAgent(serverId: string, agentId: string): Promise<boolean> {
+  return serializeAgentLifecycle(serverId, agentId, async () => {
+    await setAgentRunIntent(serverId, agentId, false);
+    return dequeueAgentNow(serverId, agentId);
+  });
+}
+async function dequeueAgentNow(serverId: string, agentId: string): Promise<boolean> {
   const target = await agentControlTarget(serverId, agentId);
   if (target.ok) {
     if (!sendAgentControl(serverId, target, { type: "agent:dequeue", agentId })) log.warn("agent dequeue target unavailable", { agentId, reason: "machine offline" });
@@ -1208,6 +1234,12 @@ export async function dequeueAgent(serverId: string, agentId: string): Promise<b
   return true;
 }
 export async function resetAgent(serverId: string, agentId: string, wipeWorkspace = false, clearMemory = false): Promise<AgentControlResult> {
+  return serializeAgentLifecycle(serverId, agentId, async () => {
+    await setAgentRunIntent(serverId, agentId, false);
+    return resetAgentNow(serverId, agentId, wipeWorkspace, clearMemory);
+  });
+}
+async function resetAgentNow(serverId: string, agentId: string, wipeWorkspace: boolean, clearMemory: boolean): Promise<AgentControlResult> {
   const target = await agentControlTarget(serverId, agentId);
   if (!target.ok) return target;
   const result = await requestAgentControl(serverId, target, { type: "agent:reset", agentId, wipeWorkspace, clearMemory });
