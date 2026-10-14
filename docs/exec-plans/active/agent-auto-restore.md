@@ -31,8 +31,13 @@ restore even if the machine is offline. Message-triggered wake behavior stays un
 - Implementation, schema/migration and doc-sync completed locally. Unit/structural lifecycle
   coverage, root/web typecheck, and production web build pass. Structural checks are not
   substitutes for DB migration or real WS/daemon testing.
-- Live acceptance is blocked by the unavailable local Docker engine and chrome-devtools.
-  Tracked in I108; no production schema/code changes have been made.
+- Isolated live acceptance is blocked by the unavailable local Docker engine and
+  chrome-devtools (I108). Authorized deployment subsequently applied the additive migration
+  before app replacement; startup reran it without changing intent. Reconnect restored
+  four enabled agents to active, leaving 25 disabled agents inactive. One start reported
+  a control ACK timeout before eventually becoming active; historical Turn ACK timeouts
+  were also observed. Full Windows process restart and end-to-end message acceptance
+  remain unverified; deployment is not equivalent to those tests.
 
 ## Remaining live acceptance
 
