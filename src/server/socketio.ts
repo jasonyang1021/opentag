@@ -52,7 +52,10 @@ export function attachSocketIO(server: Server): void {
     socket.on("join:channel", async (channelId: string) => {
       if (!channelId || typeof channelId !== "string") return;
       try {
-        if (await canReadChannel(uid, serverId, channelId)) await socket.join(`channel:${channelId}`);
+        if (await canReadChannel(uid, serverId, channelId)) {
+          await socket.join(`channel:${channelId}`);
+          socket.emit("channel:joined", { channelId }); // recover only after live delivery is ready
+        }
       } catch (error) {
         log.warn("realtime room authorization failed; join withheld", { uid, serverId, channelId, error: String(error) });
       }

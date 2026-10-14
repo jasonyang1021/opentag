@@ -3,10 +3,12 @@
 // Note: single-instance direct emit; for multi-instance horizontal scaling switch to @socket.io/redis-adapter (TODO).
 import { nextSeq } from "../redis.js";
 import { emitMapped } from "./socketio.js";
+import { liveAgentReplies } from "./liveAgentReplies.js";
 
 export function initRealtime(): void { /* socket.io is attached in index.ts, no redis fan-out needed */ }
 
 export async function publish(serverId: string, event: unknown): Promise<void> {
+  liveAgentReplies.record(serverId, event);
   await emitMapped(serverId, event);
 }
 
