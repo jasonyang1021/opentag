@@ -7,6 +7,14 @@
 
 ## Open items
 
+### I109 — Channel membership browser acceptance pending
+
+Human invitation and self-leave have focused tests and root/web build checks. The required
+chrome-devtools browser tool is unavailable in this session. Still verify the rendered
+picker, ordinary-member leave confirmation, private reinvitation and two-tab/reconnect
+behavior in an isolated browser session. Do not equate a healthy deployed app with browser
+acceptance. API integration uses only an explicitly named isolated test database.
+
 ### I108 — Agent auto-restore live acceptance pending
 
 Persistent lifecycle intent and reconnect orchestration have deterministic unit coverage,

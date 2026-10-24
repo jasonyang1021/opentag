@@ -1,5 +1,8 @@
 <h1 align="center">open-tag</h1>
 
+Channel managers can add existing Humans under **Members → Add human**; joined members
+can use **Leave channel** in the header. [Verification status](docs/exec-plans/active/channel-membership.md).
+
 Task filters, channel file delivery and opt-in desktop notifications:
 [usage and verification status](docs/collaboration-polish.md). Live acceptance remains pending.
 

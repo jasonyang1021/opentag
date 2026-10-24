@@ -56,6 +56,8 @@
 
 ## P4 Tasks & Threads — Implemented (slice03 evidence-driven alignment + end-to-end verified)
 
+- [x] **Channel Human invitations and self-leave**: managers add existing workspace Humans via Members; all members can leave from the header, with confirmation, thread-unfollow and realtime cleanup. Browser acceptance tracked in I109.
+
 - [x] Nested thread navigation: inbox/task links resolve internal thread channels with inherited read access; explicit missing channels never fall back to `#all`.
 - [x] Task field on message: As Task / right-click convert to task; channel + server task lists; convert-message; delete = revert to plain message (source message preserved)
 - [x] Task claim/status flow `todo→in_progress→in_review→done→closed` (claim atomically sets in_progress; non-enum values 400; done auto-creates thread); kanban cards link to source message; socket task events realtime

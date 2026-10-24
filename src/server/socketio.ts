@@ -9,6 +9,7 @@ import { db, schema } from "../db/index.js";
 import { verifyUser } from "./auth.js";
 import { canUserReadChannel } from "./channelAccess.js";
 import { createLogger } from "../log.js";
+import { evictHumanChannelSessions } from "./channelMembershipEvents.js";
 
 const log = createLogger("server:io");
 let io: IOServer | null = null;
@@ -122,6 +123,14 @@ export async function emitMapped(serverId: string, event: any): Promise<void> {
   const srv = io;                                                           // capture non-null (io is not narrowed inside the closure)
   const room = srv.to(`server:${serverId}`);                                // server-level (all members)
   switch (event?.type) {
+    case "channel:members-updated": {
+      if (event.removedUserId && Array.isArray(event.removedChannelIds)) {
+        await evictHumanChannelSessions(await srv.in(`server:${serverId}`).fetchSockets(), serverId, event.removedUserId, event.removedChannelIds);
+      }
+      // Descendant/private IDs are sent only to the removed member's sessions.
+      room.emit("channel:members-updated", { channelId: event.channelId });
+      break;
+    }
     case "message": await emitAuthorizedChannel(srv, serverId, event.message.channelId, [["message:new", event.message]]); break;
     case "task": {
       if (event.op === "deleted") { await emitAuthorizedChannel(srv, serverId, event.channelId, [["task:deleted", { channelId: event.channelId, taskId: event.taskId }]]); break; }

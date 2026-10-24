@@ -1,5 +1,8 @@
 <h1 align="center">open-tag</h1>
 
+频道管理员可通过 **成员 → 添加 Human** 添加社区现有用户；已加入的成员可从频道顶部
+**退出频道**。[验证状态](docs/exec-plans/active/channel-membership.md)。
+
 任务筛选、频道文件交付和可选桌面通知：
 [使用说明与验证状态](docs/collaboration-polish.md)。真实环境验收尚待完成。
 

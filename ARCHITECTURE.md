@@ -6,6 +6,18 @@
 
 ## I. Overview
 
+Channel membership: `web/src/views/ChannelMembersModal.tsx` lists members and lets
+`manageChannels` holders invite existing workspace Humans/Agents. `LeaveChannelButton.tsx`
+exposes self-leave independently of that capability. `src/server/channelMemberTarget.ts`
+validates the exclusive UUID target; `routes-api/channels.ts` checks tenant membership/live
+agents and limits membership management to ordinary public/private channels.
+`channelMembership.ts` removes a Human's root and descendant-thread memberships atomically,
+without deleting history. `socketio.ts` uses `channelMembershipEvents.ts` to evict only that user's sessions and emits targeted
+`channel:left {channelIds}`; the store forgets reconnect subscriptions and Chat returns to
+Inbox. Workspace-wide `channel:members-updated` contains only the root ID, and clients
+rejoin only after checking current membership. Public channels remain readable after leaving;
+private channels require reinvitation. No schema migration is needed for this feature.
+
 `web/src/lib/colorAvatars.ts` renders deterministic local SVG animal/robot defaults.
 `Avatar.tsx` accepts member kind and persists picker choices as `tagora:v1:animal:<seed>`
 or `tagora:v1:robot:<seed>`. Real uploaded URLs and legacy DiceBear choices are retained.
