@@ -12,6 +12,8 @@
 
 ## Active
 
+- **Channel Human invitations and self-leave** — [implementation and verification](./exec-plans/active/channel-membership.md).
+
 - **Agent auto-restore** — persistent lifecycle intent and reconnect restoration; [execution plan](./exec-plans/active/agent-auto-restore.md).
 
 - **Collaboration polish** — [execution plan](./exec-plans/active/collaboration-polish.md).

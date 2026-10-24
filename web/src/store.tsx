@@ -156,7 +156,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const createTasks = async (channelId: string, titles: string[]) => { const r = await api("POST", `/api/tasks/channel/${channelId}`, { tasks: titles.map((title) => ({ title })) }); return r?.tasks || []; };
   const openDM = async (memberType: string, memberId: string) => { const body = memberType === "user" ? { userId: memberId } : { agentId: memberId }; const r = await api("POST", "/api/channels/dm", body); if (r?.id) { await reload(); sockRef.current?.emit("join:channel", r.id); } return r?.id ?? null; };
   const joinChannel = async (id: string) => { await api("POST", `/api/channels/${id}/join`); await reload(); sockRef.current?.emit("join:channel", id); };
-  const leaveChannel = async (id: string) => { await api("POST", `/api/channels/${id}/leave`); await reload(); };
+  const forgetChannels = (channelIds: string[]) => {
+    for (const id of channelIds) { subscribedRef.current.delete(id); sockRef.current?.emit("leave:channel", id); }
+    setChannels((cs) => cs.map((c) => channelIds.includes(c.id) ? { ...c, joined: false } : c));
+    listeners.current.forEach((cb) => cb({ type: "channel:left", channelIds }));
+  };
+  const leaveChannel = async (id: string) => {
+    const sid = sidRef.current;
+    const r = await api("POST", `/api/channels/${id}/leave`);
+    if (r?.ok !== true) throw new Error(r?.error || "leave failed");
+    if (sidRef.current !== sid) return;
+    forgetChannels(r.removedChannelIds || [id]);
+    await reload();
+  };
   // A channel's badge = its own-timeline unread + its followed threads' unread. A successful read confirms that
   // server state changed, then refreshes the full badge map so overlapping channel/thread reads cannot apply
   // per-response counts out of order. Keep the captured activation owner: late responses from an old workspace
@@ -367,7 +379,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Real-time: new DM / channel membership change → reload lists + join the new channel room
       // (the server validates membership; non-member join requests are rejected).
       sock.on("dm:new", (p: any) => { reload(); if (p?.channelId) sockRef.current?.emit("join:channel", p.channelId); });
-      sock.on("channel:members-updated", (p: any) => { reload(); if (p?.channelId) sockRef.current?.emit("join:channel", p.channelId); });
+      sock.on("channel:left", (p: { channelIds: string[] }) => { if (!cancelled) { forgetChannels(p.channelIds); void reload(); } });
+      sock.on("channel:members-updated", async (p: any) => {
+        dispatch({ type: "channel:members-updated", channelId: p?.channelId });
+        try {
+          await reload();
+          const list = await api("GET", "/api/channels");
+          if (!cancelled && Array.isArray(list) && list.some((c) => c.id === p?.channelId && c.joined)) sock?.emit("join:channel", p.channelId);
+        } catch { /* A reconnect/reload can recover; never rejoin based on stale membership. */ }
+      });
       // Machine online/offline → reload machine list (DB is source of truth for status/daemon version/runtimes/new rows).
       // Note: machine:status payload omits id (only forwards {online,hostname,runtimes}), so targeted row update is not possible → full reload is safest.
       sock.on("machine:status", async (p: any) => {

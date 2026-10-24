@@ -25,6 +25,8 @@ import { AgentProfile, HumanProfile, CreateAgentModal } from "./Members.tsx";
 import { ChatSidebar, CreateChannelModal, channelCreateErrorMsg } from "./ChatSidebar.tsx";
 import { ConnectComputerWizard } from "./ConnectComputerWizard.tsx";
 import { Composer } from "./Composer.tsx";
+import { LeaveChannelButton } from "./LeaveChannelButton.tsx";
+import { ChannelMembersModal } from "./ChannelMembersModal.tsx";
 import { useConfirm, useEscClose } from "../ConfirmModal.tsx";
 import { useToast } from "../toast.tsx";
 import { AgentActivityDisclosure, agentRunPhase } from "../AgentActivity.tsx";
@@ -235,6 +237,12 @@ export function Chat() {
   }, [channelId, knownChannel?.id, slug, channelRetry]);
   const curIdRef = useRef<string | undefined>(undefined);
   curIdRef.current = cur?.id; // latest channel id for async guards: a loadOlder that resolves after a channel switch must drop its stale-channel result (no cross-channel prepend / hasMore clobber)
+  useEffect(() => onEvent((e) => {
+    if (e.type === "channel:left" && e.channelIds?.includes(curIdRef.current)) {
+      setShowMembers(false); setShowEdit(false); setThread(null); setProfile(null);
+      nav(`/s/${slug}/inbox`, { replace: true });
+    }
+  }), [slug]);
   const isDm = !!dms.find((d) => d.id === cur?.id);
   const dmPeer = dms.find((d) => d.id === cur?.id);
   const isAuditDm = dmPeer?.audit === true || cur?.audit === true;
@@ -496,6 +504,7 @@ export function Chat() {
           {!isDm && cur && cur.type !== "showcase" && cur.type !== "thread" && (
             <div className="chat-head-actions">
               <button className="joinbtn" title={t("chat.channelMembers")} onClick={() => setShowMembers(true)}><Users size={16} /><span className="joinbtn-label">{t("chat.members")}</span></button>
+              {channels.some((c) => c.id === cur.id && c.joined) && <LeaveChannelButton key={cur.id} channel={cur} />}
               {capabilities.manageChannels && <button className="joinbtn" title={t("chat.channelSettings")} onClick={() => setShowEdit(true)}>⋯</button>}
             </div>
           )}
@@ -874,43 +883,6 @@ function ThreadPanel({ channelId, parent, readOnly = false, onClose, onOpenProfi
   );
 }
 
-// Channel members modal: lists Agents (with online status) and Humans; allows adding or removing agents from the channel
-function ChannelMembersModal({ channelId, channelName, onClose }: { channelId: string; channelName: string; onClose: () => void }) {
-  /* avatars: data.agents/humans come from /channels/:id/members (carry avatarUrl); resolve to signed/scheme via resolveAvatar */
-  const { t } = useTranslation();
-  useEscClose(onClose);
-  const { api, visibleAgents: agents, attachmentUrl, capabilities } = useStore(); // visibleAgents: showcase demo props are not offered in the "add agent" list
-  const avFor = (u?: string | null) => resolveAvatar(u, attachmentUrl);
-  const [data, setData] = useState<{ agents: any[]; humans: any[] }>({ agents: [], humans: [] });
-  const load = async () => { const d = await api("GET", `/api/channels/${channelId}/members`); setData({ agents: d?.agents || [], humans: d?.humans || [] }); };
-  useEffect(() => { load(); }, [channelId]);
-  const inCh = new Set(data.agents.map((a) => a.id));
-  const addable = agents.filter((a) => !inCh.has(a.id));
-  const add = async (agentId: string) => { await api("POST", `/api/channels/${channelId}/members`, { agentId }); load(); };
-  const remove = async (agentId: string) => { await api("DELETE", `/api/channels/${channelId}/members`, { agentId }); load(); };
-  return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3># {channelName} · {t("chat.membersCount", { count: data.agents.length + data.humans.length })}</h3>
-        <div className="sec">{t("common.agents")} <span className="cnt">{data.agents.length}</span></div>
-        {data.agents.map((a) => (
-          <div key={a.id} className="item"><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><span className={"dot " + (a.activity || a.status)} />{capabilities.manageChannels && <button className="joinbtn" onClick={() => remove(a.id)}>{t("chat.remove")}</button>}</div>
-        ))}
-        <div className="sec">{t("common.humans")} <span className="cnt">{data.humans.length}</span></div>
-        {data.humans.map((u) => (
-          <div key={u.userId} className="item"><Avatar seed={u.name} url={avFor(u.avatarUrl)} size={22} /><span className="grow">{u.displayName || u.name}</span></div>
-        ))}
-        {capabilities.manageChannels && addable.length > 0 && <>
-          <div className="sec sec-sub">{t("chat.addAgent")}</div>
-          {addable.map((a) => (
-            <div key={a.id} className="item ghost"><Avatar kind="agent" seed={a.name} url={avFor(a.avatarUrl)} size={22} /><span className="grow">{a.displayName || a.name}</span><button className="joinbtn" onClick={() => add(a.id)}>{t("chat.join")}</button></div>
-          ))}
-        </>}
-        <div className="acts"><button className="cancel" onClick={onClose}>{t("chat.close")}</button></div>
-      </div>
-    </div>
-  );
-}
 
 // Channel files tab (chatTab=files): lists attachments associated with channel messages; click to download or preview
 function ChannelFiles({ channelId }: { channelId: string }) {
