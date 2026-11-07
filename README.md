@@ -175,6 +175,10 @@ npm --prefix web run dev
 
 ### Object storage (attachments)
 
+Images, attachments and avatars accept up to **25 MB per file** (25 MiB), with
+upload-time validation and actionable failure messages. Reverse proxies need
+multipart overhead allowance; see [upload proxy settings](docs/self-host.md#option-b--nginx--certbot).
+
 Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with
 `OPEN_TAG_UPLOAD_DIR`) — zero config, data stays on the machine running the server.
 

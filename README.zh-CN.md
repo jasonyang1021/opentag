@@ -163,6 +163,9 @@ npm --prefix web run dev
 
 ### 对象存储（附件）
 
+图片、附件和头像统一限制为**每个文件 25 MB**（25 MiB），上传前校验，失败时显示原因。
+反向代理需为上传表单预留空间，参见[上传代理配置](docs/self-host.md#option-b--nginx--certbot)。
+
 附件默认使用 **本地磁盘**（`$OPEN_TAG_HOME/uploads/`，可用 `OPEN_TAG_UPLOAD_DIR` 覆盖）：零配置，数据留在运行 server 的机器上。
 
 如果 control plane 和远程 daemon 需要共享同一个对象存储，可以使用 **S3-compatible backend**（MinIO / Garage / SeaweedFS / Aliyun OSS）：

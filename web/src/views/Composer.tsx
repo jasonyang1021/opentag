@@ -119,7 +119,11 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
         try {
           const att = await uploadOne(channelId, f, (pct) => setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, progress: pct } : x))));
           setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, ...att, localUrl, status: "done", progress: 100 } : x)));
-        } catch { setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, status: "error" } : x))); }
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : t("chat.uploadFailed");
+          setPendingAtts((p) => p.map((x) => (x.id === tmpId ? { ...x, status: "error", error: reason } : x)));
+          toast.error(`${f.name}: ${reason}`);
+        }
       }
     } finally { setUploading(false); }
   };
@@ -164,7 +168,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
       {pendingAtts.length > 0 && <div className="pending-atts">{pendingAtts.map((a) => {
         const img = isImage(a.mimeType);
         const src = a.localUrl || (a.status !== "uploading" ? attachmentUrl(a.id) : "");
-        return <span key={a.id} className={"patt" + (img ? " patt-img" : "") + (a.status ? " st-" + a.status : "")} title={a.filename}>
+        return <span key={a.id} className={"patt" + (img ? " patt-img" : "") + (a.status ? " st-" + a.status : "")} title={a.error ? `${a.filename}: ${a.error}` : a.filename}>
           {img && src ? <img src={src} alt={a.filename} /> : <><IconFile size={13} />{!img && a.filename}</>}
           {a.status === "uploading" && <span className="patt-prog" style={{ ["--pct" as string]: (a.progress || 0) + "%" } as CSSProperties}>{a.progress || 0}%</span>}
           {a.status === "done" && <span className="patt-ok"><CheckCircle2 size={13} /></span>}
@@ -172,6 +176,7 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           <button disabled={sending} onClick={() => setPendingAtts((p) => p.filter((x) => x.id !== a.id))}>×</button>
         </span>;
       })}</div>}
+      {pendingAtts.some((a) => a.status === "error") && <div role="alert" className="meta">{pendingAtts.filter((a) => a.status === "error").map((a) => <div key={a.id}>{a.filename}: {a.error || t("chat.uploadFailed")}</div>)}</div>}
       <input type="file" ref={imgRef} accept="image/*" multiple style={{ display: "none" }} onChange={onPickFiles} />
       <input type="file" ref={fileRef} multiple style={{ display: "none" }} onChange={onPickFiles} />
       <div className="composer-box" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
@@ -196,8 +201,8 @@ export function Composer({ channelId, placeholder, allowAsTask = false, dmAgent,
           }} />
         <div className="composer-bar">
           <div className="cb-left">
-            <button className="cb-icon im" title={t("chat.uploadImage")} disabled={uploading || sending} onClick={() => imgRef.current?.click()}><ImagePlus size={16} className="im-pop" /></button>
-            <button className="cb-icon im" title={t("chat.uploadFile")} disabled={uploading || sending} onClick={() => fileRef.current?.click()}><Paperclip size={16} className="im-tilt" /></button>
+            <button className="cb-icon im" title={`${t("chat.uploadImage")} · ${t("chat.uploadLimitHint")}`} disabled={uploading || sending} onClick={() => imgRef.current?.click()}><ImagePlus size={16} className="im-pop" /></button>
+            <button className="cb-icon im" title={`${t("chat.uploadFile")} · ${t("chat.uploadLimitHint")}`} disabled={uploading || sending} onClick={() => fileRef.current?.click()}><Paperclip size={16} className="im-tilt" /></button>
           </div>
           <div className="cb-right">
             {allowAsTask && <label className={"astask" + (asTask ? " on" : "")} title={t("chat.sendAsTaskTitle")}><input type="checkbox" checked={asTask} disabled={sending} onChange={(e) => setAsTask(e.target.checked)} />{t("chat.asTask")}</label>}

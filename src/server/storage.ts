@@ -6,6 +6,7 @@ import { readFile, mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { uploadsDir } from "../paths.js";
 
 const DRIVER = process.env.OPEN_TAG_STORAGE ?? "local";
@@ -20,12 +21,9 @@ export async function saveObject(filename: string, stream: Readable): Promise<Sa
   if (DRIVER === "s3") return saveS3(key, stream);
   await mkdir(LOCAL_DIR, { recursive: true });
   let size = 0;
-  await new Promise<void>((res, rej) => {
-    stream.on("data", (d: Buffer) => { size += d.length; });
-    const ws = createWriteStream(path.join(LOCAL_DIR, key));
-    ws.on("close", () => res()); ws.on("error", rej);
-    stream.pipe(ws);
-  });
+  stream.on("data", (d: Buffer) => { size += d.length; });
+  try { await pipeline(stream, createWriteStream(path.join(LOCAL_DIR, key))); }
+  catch (error) { await deleteObject(key); throw error; }
   return { key, size };
 }
 

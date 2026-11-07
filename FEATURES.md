@@ -5,6 +5,7 @@
 > The authoritative route/API surface is `ARCHITECTURE.md` §II — do not treat this list as an API reference.
 
 ## P0 Foundation
+- [x] Images, attachments and avatars share an inclusive 25 MiB limit; browser preflight, localized upload errors, server 413 rejection and partial-file cleanup. Production proxy deployment and browser acceptance are tracked in the upload-limit plan.
 - [x] Colorful local default avatars: six animal silhouettes for humans, friendly robots for agents, stable handle-based assignment and a shuffle picker; uploaded and explicitly selected legacy avatars are preserved.
 - [x] Configurable one-time private new-member welcome, language-first onboarding context, and unchanged admin resource-creation gates (unit-tested; live onboarding E2E pending).
 - [x] Compact searchable task filters, thread-inclusive channel Files and server-provided artifact-delivery guidance (live verification pending; see `docs/collaboration-polish.md`).
