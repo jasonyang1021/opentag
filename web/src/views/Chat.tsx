@@ -83,12 +83,14 @@ export function keepPinnedToBottomDuringEnter(el: Pick<HTMLDivElement, "scrollTo
 function AttCard({ a, url }: { a: Att; url: string }) {
   const [lb, setLb] = useState(false);
   const [vErr, setVErr] = useState(false);
-  if (isImage(a.mimeType)) return (<>
-    <button className="msg-att-img" title={a.filename} onClick={() => setLb(true)}><img src={url} alt={a.filename} loading="lazy" /></button>
+  const [imgErr, setImgErr] = useState(false);
+  if (isImage(a.mimeType) && !imgErr) return (<>
+    <button className="msg-att-img" title={a.filename} onClick={() => setLb(true)}><img src={url} alt={a.filename} loading="lazy" onError={() => setImgErr(true)} /></button>
+    <a href={url} download={a.filename} className="meta">{i18n.t("chat.download")}</a>
     {lb && <Lightbox src={url} alt={a.filename} onClose={() => setLb(false)} />}
   </>);
   if (isVideo(a.mimeType) && !vErr) return <video className="msg-att-video" src={url} controls playsInline preload="metadata" title={a.filename} onError={() => setVErr(true)} />;
-  return <a className="msg-att" href={url} target="_blank" rel="noreferrer"><IconFile size={14} /><span className="grow">{a.filename}{vErr ? i18n.t("chat.videoUnsupported") : ""}</span><span className="asz">{fmtSize(a.sizeBytes)}</span></a>;
+  return <a className="msg-att" href={url} target="_blank" rel="noreferrer"><IconFile size={14} /><span className="grow">{a.filename}{vErr ? i18n.t("chat.videoUnsupported") : ""}{imgErr ? ` — ${i18n.t("chat.imagePreviewFailed")}` : ""}</span><span className="asz">{fmtSize(a.sizeBytes)}</span></a>;
 }
 
 // Message emoji reactions: chip shows emoji×count (highlighted if the current user reacted), click to toggle; hovering the add button reveals a quick picker

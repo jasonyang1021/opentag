@@ -590,6 +590,7 @@
     "retryLoad": "Retry",
     "jumpToMessage": "Jump to original message",
     "download": "Download",
+    "imagePreviewFailed": "Image preview failed; click to open the file",
     "asTask": "As Task",
     "agentKind": "agent",
     "userKind": "user",

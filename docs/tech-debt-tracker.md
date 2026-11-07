@@ -7,6 +7,15 @@
 
 ## Open items
 
+### I111 — Generated image live acceptance pending
+
+Image signature detection and untyped multipart uploads have isolated HTTP coverage.
+The required chrome-devtools tool is unavailable. Verify real generated-image delivery
+through an authorized agent, channel/DM/thread previews, lightbox/download/failure UI,
+and an isolated S3 bucket after deployment. Historical generic image metadata is
+unchanged; migrate only after verifying actual stored content if historical previews
+are required. See `exec-plans/active/agent-image-preview.md`.
+
 ### I110 — Upload limit deployment and live acceptance pending
 
 Local multipart and client tests pass, but the required chrome-devtools tool is
