@@ -7,6 +7,31 @@
 
 ## Open items
 
+### I112 — Image download browser/device acceptance pending
+
+Shared download controls and helper tests are implemented; required chrome-devtools
+is unavailable. Verify actual saved original bytes/filenames on desktop, Safari/Chrome
+mobile and embedded browsers, linked Markdown images, keyboard focus, and explicit
+CORS/expired-auth failure fallback. No guarantee that a browser download reaches a
+phone album. See `exec-plans/active/image-download.md`.
+
+### I111 — Generated image live acceptance pending
+
+Image signature detection and untyped multipart uploads have isolated HTTP coverage.
+The required chrome-devtools tool is unavailable. Verify real generated-image delivery
+through an authorized agent, channel/DM/thread previews, lightbox/download/failure UI,
+and an isolated S3 bucket after deployment. Historical generic image metadata is
+unchanged; migrate only after verifying actual stored content if historical previews
+are required. See `exec-plans/active/agent-image-preview.md`.
+
+### I110 — Upload limit live acceptance pending
+
+Local multipart and client tests pass, as do deployed-image isolated tests and
+public proxy smoke checks. The required chrome-devtools tool is unavailable.
+Verify authenticated 25 MiB and
+oversize uploads in chat/avatar views, and check S3 object cleanup against an
+isolated bucket before claiming those flows tested. See the upload-limit plan.
+
 ### I109 — Channel membership browser acceptance pending
 
 Human invitation and self-leave have focused tests and root/web build checks. The required
@@ -67,7 +92,6 @@ Deployment smoke checks do not replace the browser/Agent acceptance above.
 | I24 | **Several polish items from UX audit intentionally deferred** | Remaining non-critical items from a full-site persona review | Deferred (not omissions): ① trajectory column collapse — cross-component `Layout`/`Chat` grid coordination, high regression risk given recent scrim grid fix, and resizer already provides a workaround; ② reactions picker + mention menu full keyboard accessibility — mention menu now supports ↑/↓ + Enter/Tab selection with a highlighted-index + Esc to close (`Chat.tsx`); reactions picker keyboard access still pending (trigger is hover, needs focus management refactor); ③ j/k message navigation — not verified in comparable products, do not invent; ④ Help onboarding tour — already have empty-state guidance (add-computer onboarding modal/empty copy), full tour is over-engineering. **High-value items done this round**: Cmd+K global jump, site-wide :focus-visible, 7 modal Esc handlers, agent status dot aria, ConfirmModal (replaces native confirm×4), rail labels, DM uuid fallback, wake-state visualization, shadow elevation token into design system | 🅿️ Deferred (do when user requests) |
 | I25 | **codex runtime has no per-agent `CODEX_HOME` / MCP isolation injection** | Project-directory binding and its shared-root picker separate runtime cwd from OpenTag state and constrain which paths the web may disclose/bind, but intentionally preserve the real user `HOME`; existing `~/.codex` auth/config/MCP/skills remain shared and the runtime OS user may still read outside the project. | Future: design an explicit inheritance model before generating per-agent `CODEX_HOME/config.toml`; auth, global MCP/config, plugins, and migration must not disappear when isolation is enabled. Strict filesystem isolation additionally needs a dedicated OS account, container, or OS sandbox. | ⬜ Pending (separate from project binding/browser) |
 | I27 | **Pre-existing agent names with spaces/illegal chars are not backfilled** | Creation-time validation (#3) only guards new agents via `POST /api/agents`; rows created earlier (e.g. an agent whose `name` is `Code-review master`) keep their space-bearing handle and stay hard to `@`/`dm:@` by text | Decide a backfill: rename offending handles (accepting that text-based historical message/DM resolution keyed on the old `name` may shift — uuid-keyed resolution is unaffected), or leave as-is. Kept out of #3 to keep the fix surgical | ⬜ Pending (follow-up to #3; intentionally deferred) |
-| I31 | **Oversized uploads are silently truncated, not rejected** | `attachments.ts` busboy `limits.fileSize: 25MB`: on overflow busboy ends the file stream early; `saveObject` persists the truncated bytes in **both** local and S3 drivers, and the upload still returns `200` (no `file.truncated`/`limit` check). A >25MB file is stored corrupt-but-looks-fine. Pre-existing, not S3-specific; surfaced while building the S3 E2E | Detect the busboy `limit` event per file → reject the upload (or mark the attachment) instead of silently storing a truncated object; covers both drivers at the one `attachments.ts` boundary | ⬜ Pending (deferred — kept the S3 close-loop diff surgical) |
 | I33 | **`@fancyboi999/open-tag-daemon` published to npm + onboarding wired to npx** (was: built but unpublished + UI showed `npm run daemon`) | `packages/daemon/` (esbuild bundle of `src/daemon` + `src/cli`); `.github/workflows/publish-daemon.yml`; `web/src/views/misc.tsx` + `connectModal*` locales. | ✅ ① Published `v0.1.0` (user scope, public, provenance). Publish auth moved to npm **Trusted Publishing (OIDC, token-less)** — workflow drops `NODE_AUTH_TOKEN`, upgrades npm ≥11.5.1, relies on `id-token: write`. The repository coordinate is now owner `fancyboi999` / repo `open-tag` / workflow `publish-daemon.yml`; update the npm-side trusted-publisher registration before the next release. ✅ ② Connect-a-computer modal + empty-state hint now show `npx @fancyboi999/open-tag-daemon …` (#33). ⚠️ **Remaining:** rebind the npm Trusted Publisher, revoke the first publish token (it was pasted in chat), and delete the now-unused `NPM_TOKEN` repo secret. | 🟡 Published + npx onboarding complete; npm Trusted Publisher rebind pending after repository-coordinate change |
 | I39 | **Copilot + kimi model lists are static, not discovered from the user's actual account** | Dynamic model discovery landed for **opencode / cursor / pi / codex** (model list via shell command; Codex also reports effort levels) and **claude** (CLI alias catalog + per-model effort levels from `claude --help`; `listModels.ts`, `runtimeModels.ts`). **copilot and kimi are still static**: copilot's only programmatic source is the `copilot --acp` `availableModels` handshake (ACP / JSON-RPC over stdio); kimi similarly requires its own JSON-RPC-over-stdio session setup — neither fits the daemon's current one-shot shell-command adapter. multica already has a complete ACP handshake sequence that could be adapted. Picking a model the account lacks still fails at runtime (stderr → `error` activity), but cannot be pre-warned | Adapt multica's ACP handshake pattern: a lightweight probe subprocess that does the ACP/JSON-RPC init, reads `availableModels`, and exits — reuse the existing `probe-models` / `models` WS-RPC so no new daemon→server channel is needed. Add copilot and kimi to `DYNAMIC_RUNTIMES` once the probe is built | ⬜ Pending (daemon→server channel now exists; only the ACP probe subprocess remains) |
 | I50 | **opencode `--verbose` `reasoning.variants` not consumed** | `listModels.ts` calls `opencode models --verbose` and parses the JSON; model names are extracted but the per-model `reasoning.variants` (thinking capability flags, analogous to claude `--effort` levels) are silently dropped. As a result, opencode models that support thinking are treated as plain text-only models in the UI | Parse `reasoning.variants` from the verbose JSON and include them in the returned model list as thinking-level descriptors, mirroring the claude/codex path | ⬜ Pending |

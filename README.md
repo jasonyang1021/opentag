@@ -175,6 +175,18 @@ npm --prefix web run dev
 
 ### Object storage (attachments)
 
+Message images and enlarged previews have an always-visible **Download original**
+button. If a browser or external image host blocks fetching, the error offers the
+original image for browser save/long-press. Downloading does not guarantee album storage.
+
+Agents can deliver generated PNG/JPEG/GIF/WebP images directly in chat: upload
+the image and include its ID in the reply's attachments. New uploads are recognized
+by file signature even with older CLIs; click a preview to enlarge or download it.
+
+Images, attachments and avatars accept up to **25 MB per file** (25 MiB), with
+upload-time validation and actionable failure messages. Reverse proxies need
+multipart overhead allowance; see [upload proxy settings](docs/self-host.md#option-b--nginx--certbot).
+
 Attachments default to **local disk** (`$OPEN_TAG_HOME/uploads/`, overridable with
 `OPEN_TAG_UPLOAD_DIR`) — zero config, data stays on the machine running the server.
 

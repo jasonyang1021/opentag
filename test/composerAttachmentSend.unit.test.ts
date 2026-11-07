@@ -25,7 +25,8 @@ test("composer wires the readiness decision before clearing its draft", () => {
   assert.match(src, /finally \{\s*sendingRef\.current = false; setSending\(false\);/, "the send lock must release after the request settles");
   assert.match(src, /disabled=\{!canSend\}/, "the button must expose the same readiness rule");
   assert.match(src, /const ids = pendingAtts\.map\(\(a\) => a\.id\)/, "a ready queue must be attached in full");
-  assert.match(src, /catch \{ setPendingAtts\(\(p\) => p\.map\(\(x\) => \(x\.id === tmpId \? \{ \.\.\.x, status: "error" \} : x\)\)\); \}/, "a failed upload must remain visible");
+  assert.match(src, /status: "error", error: reason/, "a failed upload must remain visible with a reason");
+  assert.match(src, /toast\.error\(`\$\{f.name\}: \$\{reason\}`\)/, "upload failure must show actionable feedback");
   assert.match(src, /setPendingAtts\(\(p\) => p\.filter\(\(x\) => x\.id !== a\.id\)\)/, "the user must be able to remove a blocked row explicitly");
 });
 

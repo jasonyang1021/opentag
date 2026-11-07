@@ -163,6 +163,15 @@ npm --prefix web run dev
 
 ### 对象存储（附件）
 
+对话图片及放大预览均提供常驻的**下载原图**按钮。若浏览器或外部图片站点阻止下载，
+会提示打开原图，使用浏览器保存或长按操作；下载不等于已保存到手机相册。
+
+Agent 生成的 PNG/JPEG/GIF/WebP 图片上传并作为回复附件发送后，会直接显示在对话中，
+支持点击放大和下载。新上传的图片按文件内容识别，兼容旧版 CLI；历史附件元数据保持不变。
+
+图片、附件和头像统一限制为**每个文件 25 MB**（25 MiB），上传前校验，失败时显示原因。
+反向代理需为上传表单预留空间，参见[上传代理配置](docs/self-host.md#option-b--nginx--certbot)。
+
 附件默认使用 **本地磁盘**（`$OPEN_TAG_HOME/uploads/`，可用 `OPEN_TAG_UPLOAD_DIR` 覆盖）：零配置，数据留在运行 server 的机器上。
 
 如果 control plane 和远程 daemon 需要共享同一个对象存储，可以使用 **S3-compatible backend**（MinIO / Garage / SeaweedFS / Aliyun OSS）：

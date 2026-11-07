@@ -1,6 +1,7 @@
 // Control plane entry point: HTTP (/api/* human, /agent-api/* agent) + WS (/daemon/connect) + SSE
 import "../env.js"; // must be first: loads .env before any module reads process.env (e.g. db)
 import http from "node:http";
+import { UploadLimitError } from "./uploadError.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,6 +129,10 @@ const server = http.createServer(async (req, res) => {
     if (method === "GET" && await serveStatic(res, url.pathname)) return;
     sendErr(res, 404, "not found");
   } catch (e: any) {
+    if (e instanceof UploadLimitError) {
+      sendErr(res, e.status, e.code, { maxBytes: e.maxBytes, maxFiles: e.maxFiles });
+      return;
+    }
     // Postgres 22P02 (invalid text representation — e.g. a non-uuid client id cast into a uuid column,
     // drizzle wraps the original error as .cause) is a malformed-input class, not a server fault: respond
     // 400 without the raw query text. Route boundaries validate ids explicitly (isUuid); this is the

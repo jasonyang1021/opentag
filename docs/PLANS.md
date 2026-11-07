@@ -12,6 +12,12 @@
 
 ## Active
 
+- **Image download controls** — [implementation and verification](./exec-plans/active/image-download.md).
+
+- **Agent generated image previews** — [implementation and verification](./exec-plans/active/agent-image-preview.md).
+
+- **Unified attachment upload limit** — [implementation and verification](./exec-plans/active/upload-limit.md).
+
 - **Channel Human invitations and self-leave** — [implementation and verification](./exec-plans/active/channel-membership.md).
 
 - **Agent auto-restore** — persistent lifecycle intent and reconnect restoration; [execution plan](./exec-plans/active/agent-auto-restore.md).

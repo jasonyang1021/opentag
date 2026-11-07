@@ -1,0 +1,7 @@
+.message-image{display:inline-flex;flex-direction:column;align-items:flex-start;max-width:100%;gap:6px}
+.image-download-actions{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;font-size:13px;line-height:1.5}
+.image-download-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 12px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--surface-strong);color:var(--ink);cursor:pointer;font:inherit}
+.image-download-button:disabled{opacity:.65;cursor:wait}
+.image-download-button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.image-download-error{display:block;overflow-wrap:anywhere}
+.lightbox-download{position:absolute;top:16px;right:68px;z-index:201;max-width:calc(100% - 90px);padding:4px;background:var(--surface-strong);color:var(--ink);border-radius:10px}

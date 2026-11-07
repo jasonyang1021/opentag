@@ -17,7 +17,7 @@ import { Smile, X, ExternalLink, CheckCircle2, MessageCircle, MoreHorizontal, Li
 const TASK_ICON: Record<string, typeof Circle> = { todo: Circle, in_progress: Play, in_review: Eye, done: CheckCircle2, closed: Ban };
 import { IconFile, IconExternalLink, IconDownload } from "../icons.tsx";
 import { Avatar, resolveAvatar } from "../Avatar.tsx";
-import { Lightbox } from "../Lightbox.tsx";
+import { MessageImage } from "../MessageImage.tsx";
 import { TaskBoard, ynOptions, ST_LABEL } from "../TaskBoard.tsx";
 import { PaneEmpty } from "../PaneEmpty.tsx";
 import { ChatSkeleton } from "./Skeleton.tsx";
@@ -81,12 +81,8 @@ export function keepPinnedToBottomDuringEnter(el: Pick<HTMLDivElement, "scrollTo
 
 // Message attachments: images shown inline with lightbox, videos shown with inline player; other files shown as a file card. Videos that fail to play fall back to a download card.
 function AttCard({ a, url }: { a: Att; url: string }) {
-  const [lb, setLb] = useState(false);
   const [vErr, setVErr] = useState(false);
-  if (isImage(a.mimeType)) return (<>
-    <button className="msg-att-img" title={a.filename} onClick={() => setLb(true)}><img src={url} alt={a.filename} loading="lazy" /></button>
-    {lb && <Lightbox src={url} alt={a.filename} onClose={() => setLb(false)} />}
-  </>);
+  if (isImage(a.mimeType)) return <MessageImage key={url} src={url} alt={a.filename} filename={a.filename} />;
   if (isVideo(a.mimeType) && !vErr) return <video className="msg-att-video" src={url} controls playsInline preload="metadata" title={a.filename} onError={() => setVErr(true)} />;
   return <a className="msg-att" href={url} target="_blank" rel="noreferrer"><IconFile size={14} /><span className="grow">{a.filename}{vErr ? i18n.t("chat.videoUnsupported") : ""}</span><span className="asz">{fmtSize(a.sizeBytes)}</span></a>;
 }

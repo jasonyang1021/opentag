@@ -4,6 +4,7 @@ import { io, type Socket } from "socket.io-client";
 import { messageUnreadDelta, threadUnreadDelta } from "./threadUnread";
 import { initialAuthState, TOKEN_KEY, type AuthState } from "./routing.ts";
 import { createUnreadRefresh, type UnreadRefresh } from "./unreadRefresh";
+import { assertUploadSize, uploadError } from "./lib/uploadErrors";
 
 export interface Channel { id: string; name: string; description?: string; type: string; joined?: boolean; lastMessageAt?: string; archivedAt?: string | null }
 export interface Dm { id: string; name: string; type: string; description?: string; lastMessageAt?: string; audit?: boolean; peerId?: string | null; peerName?: string | null; peerDisplayName?: string | null; peerType?: string | null; peerAvatarUrl?: string | null }
@@ -181,42 +182,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   };
   const uploadFiles = async (channelId: string, files: FileList | File[]) => {
+    for (const file of Array.from(files)) assertUploadSize(file);
     const fd = new FormData(); fd.append("channelId", channelId);
     for (const f of Array.from(files)) fd.append("files", f);
     const r = await fetch("/api/attachments/upload", { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
-    return (await r.json())?.attachments || [];
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw uploadError(r.status, data);
+    if (!Array.isArray(data?.attachments) || !data.attachments.length) throw uploadError(500);
+    return data.attachments;
   };
   // Single-file upload with progress tracking (XHR; fetch does not expose upload progress). Returns one attachment.
   const uploadOne = (channelId: string, file: File, onProgress?: (pct: number) => void) => new Promise<any>((resolve, reject) => {
+    assertUploadSize(file);
     const fd = new FormData(); fd.append("channelId", channelId); fd.append("files", file);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/attachments/upload");
     xhr.setRequestHeader("authorization", "Bearer " + tokenRef.current);
     xhr.setRequestHeader("x-server-id", sidRef.current);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100)); };
-    xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) { try { resolve(JSON.parse(xhr.responseText)?.attachments?.[0]); } catch { reject(new Error("parse")); } } else reject(new Error("status " + xhr.status)); };
-    xhr.onerror = () => reject(new Error("network"));
+    xhr.onload = () => {
+      let data: any; try { data = JSON.parse(xhr.responseText); } catch { /* Proxy errors can be HTML. */ }
+      if (xhr.status >= 200 && xhr.status < 300 && data?.attachments?.[0]?.id) resolve(data.attachments[0]);
+      else reject(uploadError(xhr.status, data));
+    };
+    xhr.onerror = () => reject(uploadError(0));
+    xhr.onabort = () => reject(uploadError(0));
     xhr.send(fd);
   });
   const attachmentUrl = (id: string) => `/api/attachments/${id}?token=${encodeURIComponent(tokenRef.current)}`;
   const uploadServerAvatar = async (file: File) => { // workspace avatar upload (owner/admin only): upload image → refresh sidebar tile
+    assertUploadSize(file);
     const fd = new FormData(); fd.append("files", file);
     const r = await fetch(`/api/servers/${sidRef.current}/avatar`, { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
+    if (!r.ok) throw uploadError(r.status, await r.json().catch(() => null));
     const { avatarUrl } = await r.json();
     setServerAvatar(avatarUrl ? `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}` : null);
   };
   const uploadAgentAvatar = async (agentId: string, file: File): Promise<string> => {
+    assertUploadSize(file);
     const fd = new FormData(); fd.append("files", file);
     const r = await fetch(`/api/agents/${agentId}/avatar`, { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
+    if (!r.ok) throw uploadError(r.status, await r.json().catch(() => null));
     const { avatarUrl } = await r.json();
     return `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}`;
   };
   const uploadUserAvatar = async (file: File): Promise<string> => {
+    assertUploadSize(file);
     const fd = new FormData(); fd.append("files", file);
     const r = await fetch("/api/auth/me/avatar", { method: "POST", headers: { authorization: "Bearer " + tokenRef.current, "x-server-id": sidRef.current }, body: fd });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || "upload failed");
+    if (!r.ok) throw uploadError(r.status, await r.json().catch(() => null));
     const { avatarUrl } = await r.json();
     return `${avatarUrl}?token=${encodeURIComponent(tokenRef.current)}`;
   };

@@ -196,6 +196,8 @@ server {
 server {
     listen 443 ssl;
     server_name your-domain.com;
+    # 25 MiB per file; allow multipart framing overhead.
+    client_max_body_size 26m;
 
     ssl_certificate     /etc/letsencrypt/live/your-domain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
@@ -219,8 +221,20 @@ server {
 ```bash
 ln -s /etc/nginx/sites-available/open-tag /etc/nginx/sites-enabled/
 certbot --nginx -d your-domain.com
-nginx -s reload
+nginx -t && nginx -s reload
 ```
+
+Attachments and avatars accept files up to **25 MiB (26,214,400 bytes)**, inclusive
+(displayed as 25 MB). The browser checks before uploading; the server rejects
+oversized files with HTTP 413 `upload_too_large` and removes objects saved by that
+rejected request. A request may contain at most 10 files (`upload_too_many_files`).
+The proxy's `26m` limit applies to the **whole request**, not each file: web chat
+uploads files individually; API clients should do the same for large files.
+Apply this directive to the actual serving virtual host, including HTTP if it
+proxies rather than redirects, and check for stricter location/CDN limits.
+Keep a copy of the existing configuration, run `nginx -t`, then reload.
+Verify an exact 25 MiB file and an oversized file through the public proxy.
+An HTML 413 from nginx is also translated into a size error in the composer.
 
 ### Step 6 — Verify
 
