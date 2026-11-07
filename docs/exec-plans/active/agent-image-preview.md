@@ -1,6 +1,6 @@
 # Agent generated image previews
 
-Implementation complete; deployment and live browser acceptance pending.
+Implementation deployed; live browser acceptance pending.
 
 Agent CLI uploads use an untyped Blob, causing image results to be persisted as
 generic binary files. Detect PNG/JPEG/GIF/WebP from a bounded 16-byte prefix while
@@ -20,3 +20,8 @@ malformed stream cleanup and delivery instructions. Another 27 MIME/XSS header
 regressions pass with isolated test credentials. Typecheck and web build pass.
 Required chrome-devtools is unavailable; real agent-to-browser and S3 acceptance
 remain unverified, tracked in I111.
+
+Deployment verification: application image passed the same 15 focused tests in
+an isolated container; public health and login returned 200 with the expected new
+frontend asset. App, database and Redis are healthy. Real agent/browser acceptance
+and historical metadata migration remain outside this verification.

@@ -16,11 +16,11 @@ and an isolated S3 bucket after deployment. Historical generic image metadata is
 unchanged; migrate only after verifying actual stored content if historical previews
 are required. See `exec-plans/active/agent-image-preview.md`.
 
-### I110 — Upload limit deployment and live acceptance pending
+### I110 — Upload limit live acceptance pending
 
-Local multipart and client tests pass, but the required chrome-devtools tool is
-unavailable and the cloud-console browser connection fails before opening tabs.
-Deploy the app and proxy overhead allowance, verify authenticated 25 MiB and
+Local multipart and client tests pass, as do deployed-image isolated tests and
+public proxy smoke checks. The required chrome-devtools tool is unavailable.
+Verify authenticated 25 MiB and
 oversize uploads in chat/avatar views, and check S3 object cleanup against an
 isolated bucket before claiming those flows tested. See the upload-limit plan.
 

@@ -1,6 +1,6 @@
 # Unified attachment upload limit
 
-Status: implemented and locally verified; deployment pending browser connection recovery.
+Status: deployed and smoke-tested; authenticated browser acceptance pending.
 
 - Enforce an inclusive 25 MiB per-file limit in browser and shared server upload parser.
 - Reject oversize/file-count errors with structured HTTP 413 and remove saved objects on rejected requests.
@@ -17,3 +17,9 @@ EN/ZH client error mapping and composer failure wiring are covered.
 S3 live cleanup and rendered browser acceptance are not verified (I110).
 Deployment must update the actual app virtual host to `client_max_body_size 26m`
 and rebuild the app; this is framing allowance, not a larger per-file limit.
+
+Deployment applied the 26m request allowance and rebuilt the application. Public
+25 MiB anonymous POST now reaches application authentication (401 JSON); 27 MiB
+is rejected by the proxy (413). These smoke checks do not assert authenticated
+production attachment delivery. Exact-file boundaries passed in the deployed
+image's isolated multipart tests.
