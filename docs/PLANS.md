@@ -12,6 +12,8 @@
 
 ## Active
 
+- **Image download controls** — [implementation and verification](./exec-plans/active/image-download.md).
+
 - **Agent generated image previews** — [implementation and verification](./exec-plans/active/agent-image-preview.md).
 
 - **Unified attachment upload limit** — [implementation and verification](./exec-plans/active/upload-limit.md).

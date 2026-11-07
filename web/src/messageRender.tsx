@@ -11,6 +11,7 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { copyText } from "./lib/clipboard.ts";
+import { MessageImage } from "./MessageImage.tsx";
 
 const alertTypes = new Set(["note", "tip", "important", "warning", "caution"]);
 
@@ -337,6 +338,7 @@ export function markdownUrlTransform(url: string): string {
 }
 
 export function MessageContent({ content, mentions, channels, nav }: { content: string; mentions: MentionItem[]; channels: NameItem[]; nav: Nav }) {
+  const { t } = useTranslation();
   const src = useMemo(() => processMessageContent(content, { mentions, channels }), [content, mentions, channels]);
   return (
     <div className="md">
@@ -345,13 +347,21 @@ export function MessageContent({ content, mentions, channels, nav }: { content: 
         remarkPlugins={[remarkGfm, remarkBreaks, remarkHtmlAsText, remarkGithubAlerts, remarkColorSwatches]}
         rehypePlugins={[[rehypeSanitize, markdownSchema]]}
         components={{
+          img({ src, alt }) {
+            return src ? <MessageImage key={src} src={src} alt={alt || ""} /> : null;
+          },
           blockquote({ node: _node, children, ...props }) {
             return <GithubAlertBlockquote {...props}>{children}</GithubAlertBlockquote>;
           },
           pre({ children }) {
             return <CodeBlock>{children}</CodeBlock>;
           },
-          a({ href, children }) {
+          a({ node, href, children }) {
+            // A linked Markdown image now has its own buttons. Do not nest them
+            // in an anchor; retain the author-provided link as a separate action.
+            if (node?.children.some((child) => child.type === "element" && child.tagName === "img")) {
+              return <span>{children}<a href={href} target="_blank" rel="noreferrer">{t("chat.openImageLink")}</a></span>;
+            }
             if (typeof href === "string" && href.startsWith("tag:")) {
               const color = colorValueFromTag(href);
               if (color) return <ColorSwatch value={color} />;

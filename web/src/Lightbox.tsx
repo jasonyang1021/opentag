@@ -6,12 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import i18n from "./i18n";
+import { ImageDownload } from "./ImageDownload";
 
-export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+export function Lightbox({ src, alt, filename, onClose }: { src: string; alt: string; filename?: string; onClose: () => void }) {
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number } | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const prevFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     prevFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -19,8 +21,10 @@ export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onCl
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "Tab") {
-        e.preventDefault();
-        closeRef.current?.focus();
+        const nodes = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') || []);
+        const first = nodes[0], last = nodes[nodes.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
       }
     };
     window.addEventListener("keydown", h);
@@ -30,8 +34,9 @@ export function Lightbox({ src, alt, onClose }: { src: string; alt: string; onCl
     };
   }, [onClose]);
   return createPortal(
-    <div className="lightbox-bg" role="dialog" aria-modal="true" aria-label={alt} onClick={onClose} onWheel={(e) => { setScale((s) => Math.min(8, Math.max(1, s - e.deltaY * 0.0016 * s))); }}>
+    <div ref={dialogRef} className="lightbox-bg" role="dialog" aria-modal="true" aria-label={alt || i18n.t("chat.openOriginal")} onClick={onClose} onWheel={(e) => { setScale((s) => Math.min(8, Math.max(1, s - e.deltaY * 0.0016 * s))); }}>
       <button ref={closeRef} className="lightbox-x" onClick={onClose} aria-label={i18n.t("chat.close")}><X size={20} /></button>
+      <span className="lightbox-download" onClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}><ImageDownload src={src} filename={filename} /></span>
       <div className="lightbox-panel" onClick={(e) => e.stopPropagation()}>
         <img src={src} alt={alt} className="lightbox-img" draggable={false}
           style={{ transform: `translate(${pos.x}px,${pos.y}px) scale(${scale})`, cursor: scale > 1 ? (drag.current ? "grabbing" : "grab") : "zoom-in" }}

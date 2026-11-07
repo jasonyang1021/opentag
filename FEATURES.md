@@ -5,6 +5,7 @@
 > The authoritative route/API surface is `ARCHITECTURE.md` §II — do not treat this list as an API reference.
 
 ## P0 Foundation
+- [x] Always-visible original-image download buttons for message attachments, Markdown images and lightboxes; Blob downloads, busy/error feedback and original-image fallback. Browser/device acceptance pending.
 - [x] Generated PNG/JPEG/GIF/WebP images uploaded by agents are recognized by content and displayed inline in messages, with click-to-enlarge, download and preview-error fallback. Applies to new uploads; historical attachment metadata is unchanged.
 - [x] Images, attachments and avatars share an inclusive 25 MiB limit; browser preflight, localized upload errors, server 413 rejection and partial-file cleanup. Production proxy deployment and browser acceptance are tracked in the upload-limit plan.
 - [x] Colorful local default avatars: six animal silhouettes for humans, friendly robots for agents, stable handle-based assignment and a shuffle picker; uploaded and explicitly selected legacy avatars are preserved.

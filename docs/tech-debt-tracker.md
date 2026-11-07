@@ -7,6 +7,14 @@
 
 ## Open items
 
+### I112 — Image download browser/device acceptance pending
+
+Shared download controls and helper tests are implemented; required chrome-devtools
+is unavailable. Verify actual saved original bytes/filenames on desktop, Safari/Chrome
+mobile and embedded browsers, linked Markdown images, keyboard focus, and explicit
+CORS/expired-auth failure fallback. No guarantee that a browser download reaches a
+phone album. See `exec-plans/active/image-download.md`.
+
 ### I111 — Generated image live acceptance pending
 
 Image signature detection and untyped multipart uploads have isolated HTTP coverage.
