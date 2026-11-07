@@ -4,6 +4,7 @@ import type { IncomingMessage } from "node:http";
 import { saveObject, deleteObject } from "./storage.js";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_FILES } from "../uploadLimits.js";
 import { UploadLimitError } from "./uploadError.js";
+import { rasterImageType } from "./imageType.js";
 
 export interface UploadedFile { filename: string; mimeType: string; size: number; storageKey: string }
 
@@ -56,8 +57,14 @@ export function parseUpload(req: IncomingMessage): Promise<{ fields: Record<stri
       // on Node ≥15). The error is remembered and surfaced once, after close.
       pending.push((async () => {
         try {
-          const { key, size } = await saveObject(info.filename || "file", stream);
-          files.push({ filename: info.filename || "file", mimeType: sanitizeMimeType(info.mimeType || "application/octet-stream"), size, storageKey: key });
+          // Capture only a bounded prefix while storage consumes the stream. Attaching
+          // an extra data listener here would start flow before storage is ready.
+          let prefix = Buffer.alloc(0);
+          const { key, size } = await saveObject(info.filename || "file", stream, (chunk) => {
+            if (prefix.length < 16) prefix = Buffer.concat([prefix, chunk.subarray(0, 16 - prefix.length)]);
+          });
+          const mimeType = rasterImageType(prefix) || sanitizeMimeType(info.mimeType || "application/octet-stream");
+          files.push({ filename: info.filename || "file", mimeType, size, storageKey: key });
           if (size > MAX_UPLOAD_BYTES) firstError ??= new UploadLimitError("upload_too_large");
         } catch (e) {
           stream.resume(); // drain any unconsumed bytes so busboy can finish and emit "close"

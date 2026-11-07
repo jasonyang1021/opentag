@@ -11,7 +11,7 @@ test("real HTTP multipart uploads enforce 25 MiB inclusively and clean rejected 
   process.env.OPEN_TAG_HOME = dir;
   process.env.OPEN_TAG_STORAGE = "local";
   const { parseUpload } = await import("../src/server/attachments.ts");
-  const { deleteObject } = await import("../src/server/storage.ts");
+  const { deleteObject, readObject } = await import("../src/server/storage.ts");
   const { UploadLimitError } = await import("../src/server/uploadError.ts");
   const server = http.createServer(async (req, res) => {
     try {
@@ -33,6 +33,28 @@ test("real HTTP multipart uploads enforce 25 MiB inclusively and clean rejected 
   };
   const empty = async () => assert.deepEqual(await readdir(path.join(dir, "uploads")), []);
   try {
+    await t.test("agent CLI's untyped PNG becomes an inline image without changing bytes", async () => {
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=", "base64");
+      const form = new FormData();
+      form.append("files", new Blob([png]), "generated.png");
+      const response = await fetch(url, { method: "POST", body: form });
+      assert.equal(response.status, 200);
+      const { files } = await response.json() as any;
+      assert.equal(files[0].mimeType, "image/png");
+      assert.deepEqual(await readObject(files[0].storageKey), png);
+      await deleteObject(files[0].storageKey);
+      await empty();
+    });
+    await t.test("a PNG filename alone never promotes HTML to an image", async () => {
+      const form = new FormData();
+      form.append("files", new Blob(["<html><script>alert(1)</script></html>"]), "generated.png");
+      const response = await fetch(url, { method: "POST", body: form });
+      assert.equal(response.status, 200);
+      const { files } = await response.json() as any;
+      assert.equal(files[0].mimeType, "application/octet-stream");
+      await deleteObject(files[0].storageKey);
+      await empty();
+    });
     await t.test("25 MiB succeeds without truncation", async () => {
       const response = await upload([MAX_UPLOAD_BYTES]);
       assert.equal(response.status, 200);

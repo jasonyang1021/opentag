@@ -15,13 +15,13 @@ const LOCAL_DIR = uploadsDir();
 export interface Saved { key: string; size: number }
 
 /** Stream-save an object and return the driver-agnostic storageKey plus byte count. */
-export async function saveObject(filename: string, stream: Readable): Promise<Saved> {
+export async function saveObject(filename: string, stream: Readable, inspectChunk?: (chunk: Buffer) => void): Promise<Saved> {
   const safe = (filename || "file").replace(/[^\w.\-\u4e00-\u9fa5]/g, "_");
   const key = `${randomUUID()}__${safe}`;
-  if (DRIVER === "s3") return saveS3(key, stream);
+  if (DRIVER === "s3") return saveS3(key, stream, inspectChunk);
   await mkdir(LOCAL_DIR, { recursive: true });
   let size = 0;
-  stream.on("data", (d: Buffer) => { size += d.length; });
+  stream.on("data", (d: Buffer) => { size += d.length; inspectChunk?.(d); });
   try { await pipeline(stream, createWriteStream(path.join(LOCAL_DIR, key))); }
   catch (error) { await deleteObject(key); throw error; }
   return { key, size };
@@ -67,10 +67,10 @@ async function s3client(cfg: S3Config): Promise<any> {
     credentials: { accessKeyId: cfg.key, secretAccessKey: cfg.secret },
   });
 }
-async function saveS3(key: string, stream: Readable): Promise<Saved> {
+async function saveS3(key: string, stream: Readable, inspectChunk?: (chunk: Buffer) => void): Promise<Saved> {
   const cfg = s3Config();
   const chunks: Buffer[] = []; let size = 0;
-  for await (const c of stream) { chunks.push(c as Buffer); size += (c as Buffer).length; }
+  for await (const c of stream) { chunks.push(c as Buffer); size += (c as Buffer).length; inspectChunk?.(c as Buffer); }
   const mod = await import("@aws-sdk/client-s3" as string);
   await (await s3client(cfg)).send(new mod.PutObjectCommand({ Bucket: cfg.bucket, Key: key, Body: Buffer.concat(chunks) }));
   return { key, size };

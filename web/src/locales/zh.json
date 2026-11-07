@@ -590,6 +590,7 @@
     "retryLoad": "重试",
     "jumpToMessage": "跳到原消息",
     "download": "下载",
+    "imagePreviewFailed": "图片预览失败，点击打开文件",
     "asTask": "作为任务",
     "agentKind": "agent",
     "userKind": "用户",
