@@ -16,7 +16,7 @@ test("only light/dark are selectable; old skin maps to light and storage failure
     Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: root } });
     assert.deepEqual(THEMES, ["light", "dark"]);
     assert.equal(isTheme("collaboration"), false);
-    assert.equal(getTheme(), "dark");
+    assert.equal(getTheme(), "light");
     values.set("open-tag.theme", "collaboration");
     assert.equal(getTheme(), "light");
     for (const theme of THEMES) {
@@ -26,9 +26,9 @@ test("only light/dark are selectable; old skin maps to light and storage failure
       assert.equal(root.style.colorScheme, theme);
     }
     values.set("open-tag.theme", "invalid");
-    assert.equal(getTheme(), "dark");
+    assert.equal(getTheme(), "light");
     Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new Error("blocked"); } });
-    assert.equal(getTheme(), "dark");
+    assert.equal(getTheme(), "light");
     assert.doesNotThrow(() => saveTheme("light"));
     assert.equal(root.dataset.theme, "light");
   } finally {
