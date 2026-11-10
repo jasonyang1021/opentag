@@ -11,8 +11,8 @@ export function getTheme(): Theme {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === "collaboration") return "light"; // Retired light-based skin.
-    return isTheme(saved) ? saved : "dark";
-  } catch { return "dark"; }
+    return isTheme(saved) ? saved : "light";
+  } catch { return "light"; }
 }
 
 export function applyTheme(theme: Theme) {
